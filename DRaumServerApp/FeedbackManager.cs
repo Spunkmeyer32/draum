@@ -103,13 +103,21 @@ namespace DRaumServerApp
       }
     }
 
-    internal long processModerationText()
+    internal long getNextModeratedPostID()
+    {
+      lock(this.dataMutex)
+      {
+        return this.nextPostModerationId;
+      }
+    }
+
+    internal void resetProcessModerationText()
     {
       lock (this.dataMutex)
       {
         this.waitForDenyText = false;
         this.waitForModeratedText = false;
-        return this.nextPostModerationId;
+        this.nextPostModerationId = -1;
       }
     }
 

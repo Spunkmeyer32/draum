@@ -63,6 +63,7 @@ namespace DRaumServerApp
 
   class DRaumManager
   {
+    #region dynamicmembers
     private static NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
 
     // D-Raum Daten
@@ -88,23 +89,27 @@ namespace DRaumServerApp
     private long draumDailyChatId;
     private long draumWeeklyChatId;
 
+    #endregion
+
     // Statische Optionen
-    private static String backupFolder = "backups";
-    private static String filePrefix = "_draum_";
+    private static readonly String backupFolder = "backups";
+    private static readonly String filePrefix = "_draum_";
 
-    private static String writecommand = "schreiben";
-    private static String feedbackcommand = "nachricht";
+    private static readonly String writecommand = "schreiben";
+    private static readonly String feedbackcommand = "nachricht";
 
-    private static String modAcceptPrefix = "Y";
-    private static String modEditPrefix = "M";
-    private static String modBlockPrefix = "N";
-    private static String modGetNextCheckPostPrefix = "G";
-    private static String modDeletePrefix = "R";
-    private static String modClearFlagPrefix = "C";
+    private static readonly String modAcceptPrefix = "Y";
+    private static readonly String modEditPrefix = "M";
+    private static readonly String modBlockPrefix = "N";
+    private static readonly String modGetNextCheckPostPrefix = "G";
+    private static readonly String modDeletePrefix = "R";
+    private static readonly String modClearFlagPrefix = "C";
 
-    private static String voteUpPrefix = "U";
-    private static String voteDownPrefix = "D";
-    private static String flagPrefix = "F";
+    private static readonly String genericMessageDeletePrefix = "X";
+
+    private static readonly String voteUpPrefix = "U";
+    private static readonly String voteDownPrefix = "D";
+    private static readonly String flagPrefix = "F";
 
     private static Telegram.Bot.Types.Enums.UpdateType[] receivefilterCallbackAndMessage = { Telegram.Bot.Types.Enums.UpdateType.CallbackQuery, Telegram.Bot.Types.Enums.UpdateType.Message };
     private static Telegram.Bot.Types.Enums.UpdateType[] receivefilterCallbackOnly = { Telegram.Bot.Types.Enums.UpdateType.CallbackQuery, Telegram.Bot.Types.Enums.UpdateType.Message };
@@ -127,22 +132,22 @@ namespace DRaumServerApp
     private Task statisticCollectTask;
 
     // Vorgefertigte Texte
-    private static String postIntro = "Die nächste Eingabe von Ihnen wird als Posting interpretiert. " +
+    private static readonly String postIntro = "Die nächste Eingabe von Ihnen wird als Posting interpretiert. " +
       "Folgende Anforderungen sind zu erfüllen: \r\nTextlänge zwischen 100 und 1000\r\nKeine URLs\r\nKeine Schimpfworte und " +
       "ähnliches\r\nDer Text muss sich im Rahmen der Gesetze bewegen\r\nKeine Urheberrechtsverletzungen\r\n\r\nDer Text wird dann maschinell und ggf. durch " +
       "Menschen gegengelesen und wird bei eventuellen Anpassungen in diesem Chat zur Bestätigung durch Sie nochmal abgebildet. " +
       "Das Posting wird anonym veröffentlicht. Ihre User-ID wird intern gespeichert.";
 
-    private static String feedbackIntro = "Die nächste Eingabe von Ihnen wird als Feedback für Moderatoren und Kanalbetreiber weitergeleitet. " +
+    private static readonly String feedbackIntro = "Die nächste Eingabe von Ihnen wird als Feedback für Moderatoren und Kanalbetreiber weitergeleitet. " +
       "Folgende Anforderungen sind zu erfüllen: \r\nTextlänge zwischen 100 und 1000\r\nKeine URLs\r\nKeine Schimpfworte und " +
       "ähnliches. Ihre User-ID wird für eine eventuelle Rückmeldung gespeichert.";
 
-    private static String noModeChosen = "Willkommen. Es ist zur Zeit kein Modus gewählt. Mit /" + writecommand + " kann man Beiträge abschicken. Mit /" + feedbackcommand + " kann man " +
+    private static readonly String noModeChosen = "Willkommen. Es ist zur Zeit kein Modus gewählt. Mit /" + writecommand + " kann man Beiträge abschicken. Mit /" + feedbackcommand + " kann man " +
       "den Moderatoren und Kanalbetreibern eine Nachricht hinterlassen (Feedback/Wünsche/Kritik).";
 
-    private static String replyPost = "Danke für den Beitrag. Er wird geprüft und vor der Freigabe nochmal an Sie verschickt zum gegenlesen. Dies kann dauern, bitte Geduld.";
+    private static readonly String replyPost = "Danke für den Beitrag. Er wird geprüft und vor der Freigabe nochmal an Sie verschickt zum gegenlesen. Dies kann dauern, bitte Geduld.";
 
-    private static String replyFeedback = "Danke für das Feedback. Es wird nun von Moderatoren und Kanalbetreiber gelesen. Sie erhalten eventuell eine Rückmeldung.";
+    private static readonly String replyFeedback = "Danke für das Feedback. Es wird nun von Moderatoren und Kanalbetreiber gelesen. Sie erhalten eventuell eine Rückmeldung.";
 
     internal DRaumManager()
     {
@@ -486,9 +491,11 @@ namespace DRaumServerApp
         // Tastatur für Admin: Flag verwerfen, Beitrag löschen
         InlineKeyboardButton deleteButton = InlineKeyboardButton.WithCallbackData("Beitrag löschen", modDeletePrefix + postID);
         InlineKeyboardButton clearFlagButton = InlineKeyboardButton.WithCallbackData("Flag entfernen", modClearFlagPrefix + postID);
-        List<InlineKeyboardButton> buttonlist = new List<InlineKeyboardButton>();
-        buttonlist.Add(deleteButton);
-        buttonlist.Add(clearFlagButton);
+        List<InlineKeyboardButton> buttonlist = new List<InlineKeyboardButton>
+        {
+          deleteButton,
+          clearFlagButton
+        };
         InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup(buttonlist);
         try
         {
@@ -522,7 +529,7 @@ namespace DRaumServerApp
     {
       if( (DateTime.Now - lastWorldNewsPost).TotalHours > 24.0 )
       {
-        lastWorldNewsPost = new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day, 9, 0, 0).AddDays(1.0);
+        lastWorldNewsPost = new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day, 9, 0, 0);
         String news = this.worldInfoManager.getInfoStringForChat();
         this.telegramPublishBot.SendTextMessageAsync(
           chatId: this.draumChatId,
@@ -538,10 +545,12 @@ namespace DRaumServerApp
         InlineKeyboardButton thumbsDownButton = InlineKeyboardButton.WithCallbackData("👎 " + downvotePercentage + "%", voteDownPrefix + toPublish.getPostID());
         InlineKeyboardButton flagButton = InlineKeyboardButton.WithCallbackData("🚩 Melden", flagPrefix + toPublish.getPostID());
 
-        List<InlineKeyboardButton> buttonlist = new List<InlineKeyboardButton>();
-        buttonlist.Add(thumbsUpButton);
-        buttonlist.Add(thumbsDownButton);
-        buttonlist.Add(flagButton);
+        List<InlineKeyboardButton> buttonlist = new List<InlineKeyboardButton>
+        {
+          thumbsUpButton,
+          thumbsDownButton,
+          flagButton
+        };
         InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup(buttonlist);
 
         System.Threading.Tasks.Task<Telegram.Bot.Types.Message> task = this.telegramPublishBot.SendTextMessageAsync(
@@ -724,7 +733,6 @@ namespace DRaumServerApp
       return dspacePost;
     }
 
-
     async Task<bool> acceptPostForPublishing(long postingID)
     {
       PostingPublishManager.publishHourType publishType = this.authors.getPublishType(this.posts.getAuthorID(postingID), this.statistics.getPremiumLevelCap());
@@ -747,17 +755,31 @@ namespace DRaumServerApp
         }
         else
         {
+          InlineKeyboardButton gotItButton = InlineKeyboardButton.WithCallbackData("Verstanden", genericMessageDeletePrefix);
+          List<InlineKeyboardButton> buttonlist = new List<InlineKeyboardButton>
+          {
+            gotItButton
+          };
+          InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup(buttonlist);
           await this.telegramModerateBot.SendTextMessageAsync(
             chatId: this.moderateChatId,
-            text: "Konnte den Userchat zu folgender Posting-ID nicht erreichen (Posting wird aber veröffentlicht): " + postingID + " Textvorschau: " + this.posts.getPostingTeaser(postingID)
+            text: "Konnte den Userchat zu folgender Posting-ID nicht erreichen (Posting wird aber veröffentlicht): " + postingID + " Textvorschau: " + this.posts.getPostingTeaser(postingID),
+            replyMarkup: keyboard
           );
         }
       }
       else
       {
+        InlineKeyboardButton gotItButton = InlineKeyboardButton.WithCallbackData("Verstanden", genericMessageDeletePrefix);
+        List<InlineKeyboardButton> buttonlist = new List<InlineKeyboardButton>
+          {
+            gotItButton
+          };
+        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup(buttonlist);
         await this.telegramAdminBot.SendTextMessageAsync(
           chatId: this.adminChatId,
-          text: "Der Post " + postingID + " konnte nicht in die Liste zu veröffentlichender Posts eingefügt werden, FEHLER!"
+          text: "Der Post " + postingID + " konnte nicht in die Liste zu veröffentlichender Posts eingefügt werden, FEHLER!",
+          replyMarkup: keyboard
         );
         return false;
       }
@@ -905,15 +927,19 @@ namespace DRaumServerApp
       }
     }
 
-  
     async void onFeedbackCallback(object sender, CallbackQueryEventArgs e)
     {
       if (e.CallbackQuery.Data != null)
       {
         String callbackData = e.CallbackQuery.Data;
         String callbackAction = callbackData.Substring(0, 1);
-        long chatID = long.Parse(callbackData.Substring(1));
-        if(callbackAction.Equals(modBlockPrefix))
+        String chatidstring = callbackData.Substring(1);
+        long chatID = 0;
+        if (chatidstring.Trim().Length > 0)
+        {
+          chatID = long.Parse(chatidstring);
+        }
+        if (callbackAction.Equals(modBlockPrefix))
         {
           // verwerfen des feedbacks
           await this.telegramFeedbackBot.EditMessageReplyMarkupAsync(
@@ -941,7 +967,18 @@ namespace DRaumServerApp
       {
         String callbackData = e.CallbackQuery.Data;
         String callbackAction = callbackData.Substring(0, 1);
-        long postingID = long.Parse(callbackData.Substring(1));
+        String postidstring = callbackData.Substring(1);
+        long postingID = 0;
+        if (postidstring.Trim().Length > 0)
+        {
+          postingID = long.Parse(postidstring);
+        }
+        if (callbackAction.Equals(genericMessageDeletePrefix))
+        {
+          await this.telegramModerateBot.DeleteMessageAsync(
+            chatId: adminChatId,
+            e.CallbackQuery.Message.MessageId);
+        }
         if(callbackAction.Equals(modDeletePrefix))
         {
           // Der Admin entscheided den geflaggten Post zu entfernen
@@ -954,13 +991,20 @@ namespace DRaumServerApp
             }
             try
             {
+              // Nachricht aus dem D-Raum löschen
               await this.telegramPublishBot.DeleteMessageAsync(
                 chatId: draumChatId,
                 messageId: messageID);
+              // Nachricht aus dem Admin-Chat löschen
               await this.telegramAdminBot.DeleteMessageAsync(
                 chatId: this.adminChatId,
                 messageId: e.CallbackQuery.Message.MessageId
               );
+              // Rückmeldung an Admin
+              await this.telegramAdminBot.AnswerCallbackQueryAsync(
+                callbackQueryId: e.CallbackQuery.Id,
+                text: "Beitrag wurde gelöscht",
+                showAlert: true);
             }
             catch (Exception ex)
             {
@@ -981,6 +1025,10 @@ namespace DRaumServerApp
               chatId: this.adminChatId,
               messageId: e.CallbackQuery.Message.MessageId
             );
+            await this.telegramAdminBot.AnswerCallbackQueryAsync(
+              callbackQueryId: e.CallbackQuery.Id,
+              text: "Flag wurde entfernt",
+              showAlert: true);
           }
           else
           {
@@ -999,7 +1047,13 @@ namespace DRaumServerApp
       {
         String callbackData = e.CallbackQuery.Data;
         String callbackAction = callbackData.Substring(0, 1);
-        long postingID = long.Parse(callbackData.Substring(1));
+        String postidstring = callbackData.Substring(1);
+        long postingID = 0;
+        if (postidstring.Trim().Length > 0)
+        {
+          postingID = long.Parse(postidstring);
+        }
+        
         
         // ==  Der Moderator akzeptiert den Beitrag
         if (callbackAction.Equals(modAcceptPrefix))
@@ -1028,36 +1082,47 @@ namespace DRaumServerApp
         // ==  Der Moderator will den Beitrag bearbeiten und zurücksenden
         if (callbackAction.Equals(modEditPrefix))
         {
-          // Message Reply Buttons need to disappear
+          // Anstelle der Moderieren-Button den Entfernen-Knopf einblenden
+          InlineKeyboardButton gotItButton = InlineKeyboardButton.WithCallbackData("Entfernen", genericMessageDeletePrefix);
+          List<InlineKeyboardButton> buttonlist = new List<InlineKeyboardButton>
+          {
+            gotItButton
+          };
+          InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup(buttonlist);
           await this.telegramModerateBot.EditMessageReplyMarkupAsync(
             chatId: this.moderateChatId,
             messageId: e.CallbackQuery.Message.MessageId,
-            replyMarkup: null
+            replyMarkup: keyboard
           );
           this.feedbackManager.waitForModerationText(postingID);
-          await this.telegramModerateBot.SendTextMessageAsync(
-            chatId: this.moderateChatId,
-            text: "Jetzt editieren und abschicken",
-            replyToMessageId: e.CallbackQuery.Message.MessageId
+          await this.telegramModerateBot.AnswerCallbackQueryAsync(
+            callbackQueryId: e.CallbackQuery.Id,
+            text: "Editierten Beitrag abschicken",
+            showAlert: true
           );
           return;
         }
         // ==  Der Moderator lehnt den Beitrag ab
         if (callbackAction.Equals(modBlockPrefix))
         {
-          // Message Reply Buttons need to disappear
-          await this.telegramModerateBot.EditMessageReplyMarkupAsync(
+          // Nachricht entfernen
+          await this.telegramModerateBot.DeleteMessageAsync(
             chatId: this.moderateChatId,
-            messageId: e.CallbackQuery.Message.MessageId,
-            replyMarkup: null
+            messageId: e.CallbackQuery.Message.MessageId
           );
           this.feedbackManager.waitForDenyingText(postingID);
-          await this.telegramModerateBot.SendTextMessageAsync(
-            chatId: this.moderateChatId,
+          await this.telegramModerateBot.AnswerCallbackQueryAsync(
+            callbackQueryId: e.CallbackQuery.Id,
             text: "Begründung schreiben und abschicken",
-            replyToMessageId: e.CallbackQuery.Message.MessageId
+            showAlert: true
           );
           return;
+        }
+        if(callbackAction.Equals(genericMessageDeletePrefix))
+        {
+          await this.telegramModerateBot.DeleteMessageAsync(
+            chatId: moderateChatId,
+            e.CallbackQuery.Message.MessageId);
         }
         if(callbackAction.Equals(modGetNextCheckPostPrefix))
         {
@@ -1105,7 +1170,6 @@ namespace DRaumServerApp
             }
           }
         }
-
       }
     }
 
@@ -1116,8 +1180,13 @@ namespace DRaumServerApp
         // Auswerten: Vote-up, Vote-down, Flag
         String callbackData = e.CallbackQuery.Data;
         String callbackAction = callbackData.Substring(0, 1);
-        long postingID = long.Parse(callbackData.Substring(1));
-        if(callbackAction.Equals(voteUpPrefix))
+        String postidstring = callbackData.Substring(1);
+        long postingID = 0;
+        if (postidstring.Trim().Length > 0)
+        {
+          postingID = long.Parse(postidstring);
+        }
+        if (callbackAction.Equals(voteUpPrefix))
         {
           // UPVOTE
           String responseText = "Stimme bereits abgegeben oder eigener Post";
@@ -1210,38 +1279,47 @@ namespace DRaumServerApp
       {
         String callbackData = e.CallbackQuery.Data;
         String callbackAction = callbackData.Substring(0, 1);
-        long postingID = long.Parse(callbackData.Substring(1));        
+        String postidstring = callbackData.Substring(1);
+        long postingID = 0;
+        if (postidstring.Trim().Length > 0)
+        {
+          postingID = long.Parse(postidstring);
+        }
         if (callbackAction.Equals(modAcceptPrefix))
         {
           if(acceptPostForPublishing(postingID).Result)
           {
-            // Message Reply Buttons need to disappear
-            await this.telegramInputBot.EditMessageReplyMarkupAsync(
+            // Nachricht löschen
+            await this.telegramInputBot.DeleteMessageAsync(
               chatId: e.CallbackQuery.Message.Chat.Id,
-              messageId: e.CallbackQuery.Message.MessageId,
-              replyMarkup: null
+              messageId: e.CallbackQuery.Message.MessageId
             );
+            await this.telegramInputBot.AnswerCallbackQueryAsync(
+              callbackQueryId: e.CallbackQuery.Id,
+              text: "Der Beitrag ist angenommen",
+              showAlert: true);
           }
           else
           {
             await this.telegramInputBot.AnswerCallbackQueryAsync(
-              e.CallbackQuery.Id,
-              "Post konnte nicht veröffentlicht werden. Probieren Sie es nochmal. Falls es wiederholt fehlschlägt, wenden Sie sich an den Administrator.");
+              callbackQueryId: e.CallbackQuery.Id,
+              text: "Post konnte nicht veröffentlicht werden. Probieren Sie es nochmal. Falls es wiederholt fehlschlägt, wenden Sie sich an den Administrator.",
+              showAlert: true);
           }
           return;
         }
         if (callbackAction.Equals(modBlockPrefix))
         {
-          // Message Reply Buttons need to disappear
-          await this.telegramInputBot.EditMessageReplyMarkupAsync(
+          // Nachricht löschen
+          await this.telegramInputBot.DeleteMessageAsync(
             chatId: e.CallbackQuery.Message.Chat.Id,
-            messageId: e.CallbackQuery.Message.MessageId,
-            replyMarkup: null
+            messageId: e.CallbackQuery.Message.MessageId
           );
           this.posts.discardPost(postingID);
-          await this.telegramInputBot.SendTextMessageAsync(
-            chatId: e.CallbackQuery.From.Id,
-            text: "Der Post wird nicht veröffentlicht und verworfen."
+          await this.telegramInputBot.AnswerCallbackQueryAsync(
+            callbackQueryId: e.CallbackQuery.Id,
+            text: "Der Post wird nicht veröffentlicht und verworfen.",
+            showAlert: true
           );
           return;
         }
@@ -1250,12 +1328,12 @@ namespace DRaumServerApp
 
     void onReceiveError(Object sender, ReceiveErrorEventArgs e)
     {
-      logger.Error("Receive Exception: " + e.ApiRequestException.Message);
+      logger.Error("Telegram.Bots .NET received an Exception: " + e.ApiRequestException.Message);
     }
 
     void onReceiveGeneralError(Object sender, ReceiveGeneralErrorEventArgs e)
     {
-      logger.Error("General Exception: " + e.Exception.Message);
+      logger.Error("Telegram.Bots .NET received a general Exception: " + e.Exception.Message);
     }
 
     async void onFeedbackMessage(object sender, MessageEventArgs e)
@@ -1284,24 +1362,52 @@ namespace DRaumServerApp
         if (this.feedbackManager.isWaitingForModeratedText())
         {
           // Den moderierten Text dem Nutzer zum bestätigen zuschicken.
-          Posting posting = this.posts.getPostingInCheck(this.feedbackManager.processModerationText());
-          posting.updateText(e.Message.Text);
+          Posting posting = this.posts.getPostingInCheck(this.feedbackManager.getNextModeratedPostID());          
           if (posting != null)
           {
+            posting.updateText(e.Message.Text);
             InlineKeyboardButton acceptButton = InlineKeyboardButton.WithCallbackData("Veröffentlichen", modAcceptPrefix + posting.getPostID().ToString());
             InlineKeyboardButton cancelButton = InlineKeyboardButton.WithCallbackData("Ablehnen", modBlockPrefix + posting.getPostID().ToString());
-            List<InlineKeyboardButton> buttonlist = new List<InlineKeyboardButton>();
-            buttonlist.Add(acceptButton);
-            buttonlist.Add(cancelButton);
+            List<InlineKeyboardButton> buttonlist = new List<InlineKeyboardButton>
+            {
+              acceptButton,
+              cancelButton
+            };
             InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup(buttonlist);
             await this.telegramInputBot.SendTextMessageAsync(
               chatId: posting.getAuthorID(),
               text: posting.getPostingText(),
               replyMarkup: keyboard
             );
+            this.feedbackManager.resetProcessModerationText();
+            InlineKeyboardButton gotItButton = InlineKeyboardButton.WithCallbackData("Verstanden", genericMessageDeletePrefix);
+            List<InlineKeyboardButton> buttonlist2 = new List<InlineKeyboardButton>
+            {
+              gotItButton
+            };
+            InlineKeyboardMarkup keyboard2 = new InlineKeyboardMarkup(buttonlist2);
             await this.telegramModerateBot.SendTextMessageAsync(
               chatId: moderateChatId,
-              text: "Geänderter Text ist dem Autor zugestellt."
+              text: "Geänderter Text ist dem Autor zugestellt.",
+              replyMarkup: keyboard2
+            );
+            await this.telegramModerateBot.DeleteMessageAsync(
+              chatId: moderateChatId,
+              messageId: e.Message.MessageId);
+          }
+          else
+          {
+            InlineKeyboardButton gotItButton = InlineKeyboardButton.WithCallbackData("Verstanden", genericMessageDeletePrefix);
+            List<InlineKeyboardButton> buttonlist2 = new List<InlineKeyboardButton>
+            {
+              gotItButton
+            };
+            InlineKeyboardMarkup keyboard2 = new InlineKeyboardMarkup(buttonlist2);
+            logger.Error("Konnte den zu editierenden Post nicht laden: " + this.feedbackManager.getNextModeratedPostID());
+            await this.telegramModerateBot.SendTextMessageAsync(
+              chatId: moderateChatId,
+              text: "Der zu editierende Post wurde nicht gefunden. Nochmal den Text abschicken. Wenn der Fehler bestehen bleibt, einen Administrator informieren",
+              replyMarkup: keyboard2
             );
           }
           return;
@@ -1309,15 +1415,16 @@ namespace DRaumServerApp
         if (this.feedbackManager.isWaitingForDenyText())
         {
           // Die Begründung dem Nutzer zuschicken.
-          long postingID = this.feedbackManager.processModerationText();
-          Posting posting = this.posts.getPostingInCheck(postingID);
-          String teaser = this.posts.getPostingTeaser(postingID);
+          long postingID = this.feedbackManager.getNextModeratedPostID();
+          Posting posting = this.posts.getPostingInCheck(postingID);          
           if (posting != null)
           {
+            String teaser = this.posts.getPostingTeaser(postingID);
             await this.telegramInputBot.SendTextMessageAsync(
               chatId: posting.getAuthorID(),
               text: "Der Beitrag wurde durch Moderation abgelehnt. Begründung:\r\n" + e.Message.Text + "\r\n\r\nBeitragsvorschau: " + teaser
             );
+            this.feedbackManager.resetProcessModerationText();
             this.posts.discardPost(postingID);
           }
           return;

@@ -6,7 +6,6 @@ namespace DRaumServerApp
 {
   class FeedbackElement
   {
-
     public String text { get; set; }
     public long chatID { get; set; }
 

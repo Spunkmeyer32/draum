@@ -349,3 +349,5 @@ MigrationBackup/
 # Ionide (cross platform F# VS Code tools) working folder
 .ionide/
 /DRaumServerApp/App.config
+/DRaumServerApp/App.release.config
+/DRaumServerApp/App.testing.config

@@ -5,7 +5,12 @@ VisualStudioVersion = 16.0.30104.148
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DRaumServerApp", "DRaumServerApp.csproj", "{BA2FA9A5-633F-4742-9467-6BEA226DB3BD}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DRaumServerTest", "..\DRaumServerTest\DRaumServerTest.csproj", "{E25BDA95-F1E5-4184-9C27-F3A8252D04A1}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DRaumServerTest", "..\DRaumServerTest\DRaumServerTest.csproj", "{E25BDA95-F1E5-4184-9C27-F3A8252D04A1}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{0741548F-D860-4FFF-AD08-78EC378F9E93}"
+	ProjectSection(SolutionItems) = preProject
+		.editorconfig = .editorconfig
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
