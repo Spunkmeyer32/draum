@@ -17,9 +17,9 @@ namespace DRaumServerApp
     [JsonProperty]
     private long medianVotesPerPost;
     [JsonProperty]
-    private int medianWritersLevel;
+    private volatile int medianWritersLevel;
     [JsonProperty] 
-    private int topWritersLevel;
+    private volatile int topWritersLevel;
 
     internal DRaumStatistics() 
     {
@@ -33,6 +33,16 @@ namespace DRaumServerApp
     {
       this.medianWritersLevel = median;
       this.topWritersLevel = top;
+    }
+
+    internal void setVotesMedian(long median)
+    {
+      this.medianVotesPerPost = median;
+    }
+
+    internal long getMedianVotesPerPost()
+    {
+      return this.medianVotesPerPost;
     }
 
     internal bool isTopPost(int positiveVotesPercentage, int votes)

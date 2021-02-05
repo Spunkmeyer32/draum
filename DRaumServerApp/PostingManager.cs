@@ -381,6 +381,17 @@ namespace DRaumServerApp
       }
       return false;
     }
+
+    internal List<Posting> getDailyTopPostsFromYesterday()
+    {
+      // Iteriere über alle Posts, filtern nach Gestern, Sortieren nach Votes, Top 3 zurück
+
+      /// TODO Posts filtern
+
+
+
+      throw new NotImplementedException();
+    }
   }
 
 

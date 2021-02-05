@@ -35,6 +35,8 @@ namespace DRaumServerApp
     [JsonProperty]
     private volatile bool flagged;
     [JsonProperty]
+    private volatile bool isTopPost;
+    [JsonProperty]
     private volatile int flagCount;
     [JsonProperty]
     private volatile bool dirtyFlag; // Markiert den Post für ein Update im Chat
@@ -81,6 +83,7 @@ namespace DRaumServerApp
       this.downVotes = 0;      
       this.publishTimestamp = new DateTime(1999, 1, 1);
       this.dirtyFlag = false;
+      this.isTopPost = false;
     }
 
     internal long getPostID()

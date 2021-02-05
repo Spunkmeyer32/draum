@@ -9,7 +9,7 @@ namespace DRaumServerApp
     private static NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
 
     private static int firstHour = 9; // 9
-    private static int lastHour = 20; // 20
+    private static int lastHour = 23; // 20
     private static int minutesBetween = 20; // 20
 
     private static int premiumHour = 17;
@@ -20,7 +20,7 @@ namespace DRaumServerApp
     internal void calcNextSlot()
     {
       DateTime now = DateTime.Now;
-      while(nextPublishSlot < now)
+      while(nextPublishSlot <= now)
       {
         this.nextPublishSlot = nextPublishSlot.AddMinutes(minutesBetween);        
         if(this.nextPublishSlot.Hour > lastHour)
@@ -35,6 +35,7 @@ namespace DRaumServerApp
           this.nextPublishSlot = new DateTime(this.nextPublishSlot.Year, this.nextPublishSlot.Month, this.nextPublishSlot.Day, firstHour, 0, 0);
         }
       }
+      logger.Debug("Neuer Slot: " + this.nextPublishSlot.ToString());
     }
 
     public enum publishHourType { UNKNOWN, PREMIUM, HAPPY, NORMAL, NONE };
