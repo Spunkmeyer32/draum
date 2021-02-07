@@ -1,6 +1,7 @@
 using DRaumServerApp;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
+using System.Collections.Generic;
 using System.Threading;
 
 namespace DRaumServerTest
@@ -17,6 +18,65 @@ namespace DRaumServerTest
       posting.votedown(3, 5);
       // 20 / 25 = 0,8 * 100 = 80 ceil = 80
       Assert.AreEqual(80, posting.getUpVotePercentage());      
+    }
+
+    [TestMethod]
+    public void topPostingFilterTest()
+    {
+      PostingManager pmgr = new PostingManager();
+      DRaumStatistics drs = new DRaumStatistics();
+      const int numposts = 20;
+      for(int i=0;i< numposts; i++)
+      {
+        // ein paar posts anlegen
+        pmgr.addPosting("Bla bla bla", 10+i*10);
+      }
+
+      int count = 0;
+      KeyValuePair<long, string> pair;
+      do
+      {
+        pair = pmgr.getNextPostToCheck();
+        if(pair.Key!=-1)
+        {
+          count++;
+          String res = pmgr.acceptPost(pair.Key, PostingPublishManager.publishHourType.NORMAL);
+          Assert.IsTrue(res.StartsWith("Veröffentlichung"));
+          pmgr.testPublishing(pair.Key, DateTime.Now.AddHours(-24));
+          for (int i = 0; i < count * 3;i++)
+          {
+            if(count > numposts/2)
+            {
+              pmgr.downvote(pair.Key, 200 + i, 10);
+            }
+            else
+            {
+              pmgr.upvote(pair.Key, 200 + i, 10);
+            }            
+          }
+        }
+      } while (pair.Key != -1);
+      Assert.AreEqual(numposts, count);
+      List<Posting> list = pmgr.getDailyTopPostsFromYesterday();
+      bool found10 = false;
+      bool found09 = false;
+      bool found08 = false;
+      foreach (Posting posting in list)
+      {
+        if (posting.getPostID() == 10)
+        {
+          found10 = true;
+        }
+        if (posting.getPostID() == 9)
+        {
+          found09 = true;
+        }
+        if (posting.getPostID() == 8)
+        {
+          found08 = true;
+        }
+      }
+      Assert.IsTrue(found10 && found09 && found08);
     }
 
     [TestMethod]

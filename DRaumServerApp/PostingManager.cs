@@ -1,4 +1,5 @@
 ﻿using Newtonsoft.Json;
+using NLog.Targets;
 using System;
 using System.Collections;
 using System.Collections.Concurrent;
@@ -7,6 +8,14 @@ using System.Runtime.CompilerServices;
 
 namespace DRaumServerApp
 {
+  public class PostingVoteComparer : IComparer
+  {
+    public int Compare(object x, object y)
+    {
+      return ((Posting)y).getVoteCount() - ((Posting)x).getVoteCount();
+    }
+  }
+
   class PostingManager
   {
     [JsonIgnore]
@@ -28,6 +37,8 @@ namespace DRaumServerApp
     private ConcurrentDictionary<long, Posting> postingsInCheck;
     [JsonProperty]
     private Queue<long> postingsToPublish;
+
+
     [JsonProperty]
     private Queue<long> postingsToPublishHappyHour;
     [JsonProperty]
@@ -84,6 +95,16 @@ namespace DRaumServerApp
         postToPublish.setPublishTimestamp(new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day, DateTime.Now.Hour, DateTime.Now.Minute, 0));
       }
       return postToPublish;
+    }
+
+    internal void testPublishing(long postingid, DateTime dateTime)
+    {
+      // Welche Stunde haben wir?
+      Posting postToPublish = this.postings[postingid];        
+      if (postToPublish != null)
+      {
+        postToPublish.setPublishTimestamp(dateTime);
+      }
     }
 
     internal String acceptPost(long postingID, PostingPublishManager.publishHourType publishType)
@@ -293,7 +314,7 @@ namespace DRaumServerApp
       logger.Error("Konnte den Post mit der ID " + postingID + " nicht löschen.");
     }
 
-    internal bool canUserVote(long postingid, int id)
+    internal bool canUserVote(long postingid, long id)
     {
       if (this.postings.ContainsKey(postingid))
       {
@@ -302,7 +323,7 @@ namespace DRaumServerApp
       return false;
     }
 
-    internal bool canUserFlag(long postingid, int id)
+    internal bool canUserFlag(long postingid, long id)
     {
       if (this.postings.ContainsKey(postingid))
       {
@@ -311,7 +332,7 @@ namespace DRaumServerApp
       return false;
     }
 
-    internal void upvote(long postingID, int id, int votecount)
+    internal void upvote(long postingID, long id, int votecount)
     {
       if (this.postings.ContainsKey(postingID))
       {
@@ -319,7 +340,7 @@ namespace DRaumServerApp
       }
     }
 
-    internal void downvote(long postingID, int id, int votecount)
+    internal void downvote(long postingID, long id, int votecount)
     {
       if (this.postings.ContainsKey(postingID))
       {
@@ -327,11 +348,11 @@ namespace DRaumServerApp
       }
     }
 
-    internal void flag(long postingID, int id)
+    internal void flag(long postingID, long userID)
     {
       if (this.postings.ContainsKey(postingID))
       {
-        this.postings[postingID].flag(id);
+        this.postings[postingID].flag(userID);
       }
     }
 
@@ -385,12 +406,37 @@ namespace DRaumServerApp
     internal List<Posting> getDailyTopPostsFromYesterday()
     {
       // Iteriere über alle Posts, filtern nach Gestern, Sortieren nach Votes, Top 3 zurück
-
-      /// TODO Posts filtern
-
-
-
-      throw new NotImplementedException();
+      DateTime yesterday = new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day, 0, 0, 0);
+      yesterday = yesterday.AddDays(-1.0);
+      List<Posting> result = new List<Posting>();
+      foreach(Posting posting in this.postings.Values)
+      {
+        TimeSpan diff = posting.getPublishTimestamp() - yesterday;
+        if (diff.TotalHours >= 0.0 && diff.TotalHours <= 24.0 )
+        {
+          if (posting.getUpVotePercentage() > 50)
+          {
+            result.Add(posting);
+          }
+        }
+      }
+      if (result.Count > 3)
+      {
+        Array targetlist = result.ToArray();
+        Array.Sort(targetlist, new PostingVoteComparer());
+        List<Posting> resultList = new List<Posting>
+        {
+          (Posting)targetlist.GetValue(0),
+          (Posting)targetlist.GetValue(1),
+          (Posting)targetlist.GetValue(2)
+        };
+        return resultList;
+      }
+      else
+      {
+        return new List<Posting>( result.ToArray() );
+      }
+      
     }
   }
 

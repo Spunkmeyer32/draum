@@ -44,13 +44,25 @@ namespace DRaumServerTest
       atm.publishedSuccessfully(50);
       atm.publishedSuccessfully(50);
       atm.getMedianAndTopLevel(out median, out top);
-      Assert.AreEqual(7, median);
-      Assert.AreEqual(11, top);
+      Assert.AreEqual(6, median);
+      Assert.AreEqual(10, top);
 
       DRaumStatistics drs = new DRaumStatistics();
       drs.updateWritersLevel(top, median);
-      Assert.AreEqual(9, drs.getPremiumLevelCap());
+      Assert.AreEqual(8, drs.getPremiumLevelCap());
 
+    }
+
+    [TestMethod]
+    public void maxManagedAuthorsTest()
+    {
+      AuthorManager am = new AuthorManager();
+      for(int i=0;i<AuthorManager.MAXMANAGEDUSERS;i++)
+      {
+        am.getCoolDownTimer(i * 10 + 1, "user" + i, Author.InteractionCooldownTimer.DEFAULT);
+      }
+      Assert.ThrowsException<DRaumException>(() => { am.getCoolDownTimer(5000, "toomuch", Author.InteractionCooldownTimer.DEFAULT); });
+      
     }
   }
 }

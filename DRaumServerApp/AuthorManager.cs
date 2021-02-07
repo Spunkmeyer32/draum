@@ -3,6 +3,7 @@ using System;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using Telegram.Bot.Types;
 using static DRaumServerApp.Author;
 
 namespace DRaumServerApp
@@ -51,6 +52,10 @@ namespace DRaumServerApp
       {
         if (this.authors.Count < AuthorManager.MAXMANAGEDUSERS)
         {
+          if (externalName == null)
+          {
+            externalName = "";
+          }
           Author newAuthor = new Author(authorID, externalName);
           if (this.authors.TryAdd(authorID, newAuthor))
           {
@@ -191,9 +196,9 @@ namespace DRaumServerApp
       }
     }
 
-    internal int voteUpAndGetCount(long authorID)
+    internal int voteUpAndGetCount(long authorID, string username)
     {
-      Author author = this.getAuthor(authorID);
+      Author author = this.getAuthor(authorID, username);
       if (author != null)
       {
         return author.voteUpAndGetCount();
@@ -201,9 +206,9 @@ namespace DRaumServerApp
       return 0;
     }
 
-    internal int voteDownAndGetCount(long authorID)
+    internal int voteDownAndGetCount(long authorID, string username)
     {
-      Author author = this.getAuthor(authorID);
+      Author author = this.getAuthor(authorID,username);
       if (author != null)
       {
         return author.voteDownAndGetCount();

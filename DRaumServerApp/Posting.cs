@@ -17,6 +17,11 @@ namespace DRaumServerApp
     [JsonIgnore]
     private readonly object flagDataMutex = new object();
     [JsonIgnore]
+    private static readonly int DAYSUNTILDELETENORMAL = 76;
+
+
+
+    [JsonIgnore]
     private readonly object upvoteMutex = new object();
     [JsonIgnore]
     private readonly object downvoteMutex = new object();
@@ -34,6 +39,12 @@ namespace DRaumServerApp
     private volatile int chatMessageId;
     [JsonProperty]
     private volatile bool flagged;
+    [JsonProperty]
+    private volatile bool postedInDaily;
+    [JsonProperty]
+    private volatile bool postedInWeekly;
+    [JsonProperty]
+    private volatile int daysBeforeDelete;
     [JsonProperty]
     private volatile bool isTopPost;
     [JsonProperty]
@@ -84,6 +95,22 @@ namespace DRaumServerApp
       this.publishTimestamp = new DateTime(1999, 1, 1);
       this.dirtyFlag = false;
       this.isTopPost = false;
+      this.postedInDaily = false;
+      this.postedInWeekly = false;
+      this.daysBeforeDelete = DAYSUNTILDELETENORMAL;
+    }
+
+    internal DateTime getPublishTimestamp()
+    {
+      lock (this.publishTimestampMutex)
+      {
+        return this.publishTimestamp;
+      }
+    }
+
+    internal int getVoteCount()
+    {
+      return this.votedUsers.Count;
     }
 
     internal long getPostID()
@@ -117,6 +144,18 @@ namespace DRaumServerApp
       {
         this.postText = text;
       }      
+    }
+
+    internal void calculateDaysToDelete()
+    {
+      if(this.isTopPost)
+      {
+        this.daysBeforeDelete = DAYSUNTILDELETENORMAL + (int)((float)(this.getUpVotePercentage() - 50) * 1.5);
+      }
+      else
+      {
+        this.daysBeforeDelete = DAYSUNTILDELETENORMAL + (int)((float)(this.getUpVotePercentage() - 50) * 1.2);
+      }
     }
 
     internal string getPostStatisticText()

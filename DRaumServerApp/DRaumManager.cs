@@ -571,6 +571,7 @@ namespace DRaumServerApp
 
         List<Posting> topPosts = this.posts.getDailyTopPostsFromYesterday(); 
 
+
         /// TODO Top Daily
         /// 
         //await this.telegramPublishBot.ForwardMessageAsync(chatId: draumDailyChatId, fromChatId: draumChatId, 3);
@@ -1261,7 +1262,7 @@ namespace DRaumServerApp
           String responseText = "Stimme bereits abgegeben oder eigener Post";
           if (this.posts.canUserVote(postingID, e.CallbackQuery.From.Id))
           {            
-            int votecount = this.authors.voteUpAndGetCount(e.CallbackQuery.From.Id);
+            int votecount = this.authors.voteUpAndGetCount(e.CallbackQuery.From.Id, e.CallbackQuery.From.Username);
             if(votecount != 0)
             {
               this.statistics.increaseInteraction();
@@ -1286,7 +1287,7 @@ namespace DRaumServerApp
           String responseText = "Stimme bereits abgegeben oder eigener Post";
           if (this.posts.canUserVote(postingID, e.CallbackQuery.From.Id))
           {
-            int votecount = this.authors.voteDownAndGetCount(e.CallbackQuery.From.Id);
+            int votecount = this.authors.voteDownAndGetCount(e.CallbackQuery.From.Id, e.CallbackQuery.From.Username);
             if (votecount != 0)
             {
               this.statistics.increaseInteraction();
