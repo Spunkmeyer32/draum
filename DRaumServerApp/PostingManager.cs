@@ -12,6 +12,18 @@ namespace DRaumServerApp
   {
     public int Compare(object x, object y)
     {
+      if (x == null && y == null)
+      {
+        return 0;
+      }
+      if (x == null)
+      {
+        return -1;
+      }
+      if (y == null)
+      {
+        return 1;
+      }
       return ((Posting)y).getVoteCount() - ((Posting)x).getVoteCount();
     }
   }
@@ -20,10 +32,8 @@ namespace DRaumServerApp
   {
     [JsonIgnore]
     private static NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
-
     [JsonIgnore]
     private PostingPublishManager publishManager = new PostingPublishManager();
-
     [JsonIgnore]
     private bool postsCheckChangeFlag = true;
 
@@ -36,13 +46,11 @@ namespace DRaumServerApp
     [JsonProperty]
     private ConcurrentDictionary<long, Posting> postingsInCheck;
     [JsonProperty]
-    private Queue<long> postingsToPublish;
-
-
+    private ConcurrentQueue<long> postingsToPublish;
     [JsonProperty]
-    private Queue<long> postingsToPublishHappyHour;
+    private ConcurrentQueue<long> postingsToPublishHappyHour;
     [JsonProperty]
-    private Queue<long> postingsToPublishPremiumHour;
+    private ConcurrentQueue<long> postingsToPublishPremiumHour;
 
     internal PostingManager()
     {
@@ -50,9 +58,9 @@ namespace DRaumServerApp
       this.postings = new ConcurrentDictionary<long, Posting>();
       this.postingsToCheck = new ConcurrentQueue<Posting>();
       this.postingsInCheck = new ConcurrentDictionary<long, Posting>();
-      this.postingsToPublish = new Queue<long>();
-      this.postingsToPublishHappyHour = new Queue<long>();
-      this.postingsToPublishPremiumHour = new Queue<long>();
+      this.postingsToPublish = new ConcurrentQueue<long>();
+      this.postingsToPublishHappyHour = new ConcurrentQueue<long>();
+      this.postingsToPublishPremiumHour = new ConcurrentQueue<long>();
       this.publishManager.calcNextSlot();
     }
 
@@ -67,24 +75,34 @@ namespace DRaumServerApp
     {
       // Welche Stunde haben wir?
       Posting postToPublish = null;
+      long postId = 0;
       switch (this.publishManager.getCurrentpublishType())
       {
         case PostingPublishManager.publishHourType.NORMAL:
           if (this.postingsToPublish.Count > 0)
           {
-            postToPublish = this.postings[this.postingsToPublish.Dequeue()];
+            if (this.postingsToPublish.TryDequeue(out postId))
+            {
+              postToPublish = this.postings[postId];
+            }
           }
           break;
         case PostingPublishManager.publishHourType.HAPPY:
           if (this.postingsToPublishHappyHour.Count > 0)
           {
-            postToPublish = this.postings[this.postingsToPublishHappyHour.Dequeue()];
+            if (this.postingsToPublishHappyHour.TryDequeue(out postId))
+            {
+              postToPublish = this.postings[postId];
+            }
           }
           break;
         case PostingPublishManager.publishHourType.PREMIUM:
           if (this.postingsToPublishPremiumHour.Count > 0)
           {
-            postToPublish = this.postings[this.postingsToPublishPremiumHour.Dequeue()];
+            if (this.postingsToPublishPremiumHour.TryDequeue(out postId))
+            {
+              postToPublish = this.postings[postId];
+            }
           }
           break;
         default:
@@ -190,6 +208,14 @@ namespace DRaumServerApp
       }
     }
 
+    internal void resetTextDirtyFlag(long postingID)
+    {
+      if (this.postings.ContainsKey(postingID))
+      {
+        this.postings[postingID].resetTextDirtyFlag();
+      }
+    }
+
     internal void resetFlagged(long postingID)
     {
       if (this.postings.ContainsKey(postingID))
@@ -204,6 +230,19 @@ namespace DRaumServerApp
       foreach (Posting posting in this.postings.Values)
       {
         if (posting.isDirty())
+        {
+          postlist.Add(posting.getPostID());
+        }
+      }
+      return postlist;
+    }
+
+    internal IEnumerable<long> getTextDirtyPosts()
+    {
+      List<long> postlist = new List<long>();
+      foreach (Posting posting in this.postings.Values)
+      {
+        if (posting.isTextDirty())
         {
           postlist.Add(posting.getPostID());
         }
@@ -382,6 +421,17 @@ namespace DRaumServerApp
       }
       return "";
     }
+
+    internal string getPostingStatisticText(long postingID)
+    {
+      if (this.postings.ContainsKey(postingID))
+      {
+        return this.postings[postingID].getPostStatisticText();
+      }
+      return "";
+    }
+
+ 
 
     internal bool removePost(long postingID)
     {

@@ -68,7 +68,7 @@ namespace DRaumServerApp
 
     internal long getLastInteractionIntervalCount()
     {
-      lock(interactionMutex)
+      lock(this.interactionMutex)
       {
         return this.lastIntervalInteractions;
       }
@@ -76,7 +76,7 @@ namespace DRaumServerApp
 
     internal void switchInteractionInterval()
     {
-      lock(interactionMutex)
+      lock(this.interactionMutex)
       {
         this.lastIntervalInteractions = this.currentIntervalInteractions;
         this.currentIntervalInteractions = 0;
@@ -85,7 +85,7 @@ namespace DRaumServerApp
 
     internal void increaseInteraction()
     {
-      lock(interactionMutex)
+      lock(this.interactionMutex)
       {
         this.currentIntervalInteractions++;
       }

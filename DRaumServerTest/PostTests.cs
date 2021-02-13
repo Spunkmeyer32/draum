@@ -12,7 +12,7 @@ namespace DRaumServerTest
     [TestMethod]
     public void postVotePercentageTest()
     {
-      DRaumServerApp.Posting posting = new DRaumServerApp.Posting(10, "TestPost", 99);
+      Posting posting = new Posting(10, "TestPost", 99);
       posting.voteup(1, 10);
       posting.voteup(2, 10);
       posting.votedown(3, 5);
@@ -82,7 +82,7 @@ namespace DRaumServerTest
     [TestMethod]
     public void postDoubleVoteDenyTest()
     {
-      DRaumServerApp.Posting posting = new DRaumServerApp.Posting(10, "TestPost", 99);
+      Posting posting = new Posting(10, "TestPost", 99);
       posting.voteup(10, 10);
       Assert.IsFalse(posting.canUserVote(10));
       posting.votedown(20, 10);
@@ -111,7 +111,7 @@ namespace DRaumServerTest
             }
             // Threads laufen bis hier hin, warten dann auf das Signal des letzten Threads
             startEvent.WaitOne();
-            processMTTest(i + 10, ref posting);
+            this.processMTTest(i + 10, ref posting);
             if (Interlocked.Decrement(ref toProcess) == 0)
             { 
               resetEvent.Set();

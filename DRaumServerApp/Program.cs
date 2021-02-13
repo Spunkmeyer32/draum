@@ -1,16 +1,16 @@
 ﻿using System;
-using System.Diagnostics;
 using System.Threading;
 using System.Timers;
 
 namespace DRaumServerApp
 {
-  class Program
+  internal class Program
   {
 
-    static System.Timers.Timer timer = new System.Timers.Timer(1000) { AutoReset = true };
-    static AutoResetEvent autoResetEvent = new AutoResetEvent(false);
-    static bool stopApp = false;
+    private static readonly System.Timers.Timer timer = new System.Timers.Timer(1000) { AutoReset = true };
+    private static readonly AutoResetEvent autoResetEvent = new AutoResetEvent(false);
+    private static bool _stopApp;
+    private static bool _sigintRec;
 
     private static void Timer_Elapsed(object sender, ElapsedEventArgs e)
     {
@@ -28,21 +28,35 @@ namespace DRaumServerApp
         timer.Elapsed += Timer_Elapsed;
         timer.Start();
         Console.CancelKeyPress += delegate (object sender, ConsoleCancelEventArgs e)
-        {          
-          logger.Info("D-Raum-Server endet");
-          dRaumManager.shutDown();
-          stopApp = true;
-          logger.Info("D-Raum-Server ist beendet");
+        {
+          _sigintRec = true;
           e.Cancel = true;
+          logger.Info("D-Raum-Server endet (SIGINT)");
+          dRaumManager.shutDown();
+          _stopApp = true;
+          logger.Info("D-Raum-Server ist beendet");
         };
-        
-        while(true)
+        AppDomain.CurrentDomain.ProcessExit += (sender, eargs) =>
+        {
+          if (!_sigintRec)
+          {
+            logger.Info("D-Raum-Server endet (SIGTERM)");
+            dRaumManager.shutDown();
+            _stopApp = true;
+            logger.Info("D-Raum-Server ist beendet");
+          }
+          else
+          {
+            logger.Info("SIGTERM ignoriert, da SIGINT bekommen");
+          }
+        };
+        while (true)
         {
           if(!autoResetEvent.WaitOne(3000))
           {
             logger.Warn("Der Warte-Timer der Haupt-Schleife wurde nicht benachrichtigt, Flaschenhals??");
           }
-          if(stopApp)
+          if(_stopApp)
           {
             break;
           }

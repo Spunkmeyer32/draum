@@ -38,6 +38,10 @@ namespace DRaumServerApp
     [JsonProperty]
     private volatile int chatMessageId;
     [JsonProperty]
+    private volatile int chatMessageDailyId;
+    [JsonProperty]
+    private volatile int chatMessageWeeklyId;
+    [JsonProperty]
     private volatile bool flagged;
     [JsonProperty]
     private volatile bool postedInDaily;
@@ -51,6 +55,8 @@ namespace DRaumServerApp
     private volatile int flagCount;
     [JsonProperty]
     private volatile bool dirtyFlag; // Markiert den Post für ein Update im Chat
+    [JsonProperty]
+    private volatile bool dirtyTextFlag; // Markiert den Post für ein Update im Chat
     [JsonProperty]
     private ConcurrentBag<long> votedUsers;
     [JsonProperty]
@@ -69,7 +75,7 @@ namespace DRaumServerApp
     {
       this.postingId = -1;
       this.authorID = -1;
-      setDefaults();
+      this.setDefaults();
       this.submitTimestamp = DateTime.Now;
     }
 
@@ -77,7 +83,7 @@ namespace DRaumServerApp
     {      
       this.postingId = id;
       this.authorID = authorID;
-      setDefaults();      
+      this.setDefaults();      
       this.postText = text;
       this.submitTimestamp = DateTime.Now;
     }
@@ -85,6 +91,8 @@ namespace DRaumServerApp
     private void setDefaults()
     {      
       this.chatMessageId = -1;
+      this.chatMessageDailyId = -1;
+      this.chatMessageWeeklyId = -1;
       this.postText = "";      
       this.flagged = false;
       this.votedUsers = new ConcurrentBag<long>();
@@ -94,6 +102,7 @@ namespace DRaumServerApp
       this.downVotes = 0;      
       this.publishTimestamp = new DateTime(1999, 1, 1);
       this.dirtyFlag = false;
+      this.dirtyTextFlag = false;
       this.isTopPost = false;
       this.postedInDaily = false;
       this.postedInWeekly = false;
@@ -134,7 +143,11 @@ namespace DRaumServerApp
     {
       lock (this.publishTimestampMutex)
       {
-        this.publishTimestamp = dateTime;
+        if (!this.publishTimestamp.Equals(dateTime))
+        {
+          this.publishTimestamp = dateTime;
+          this.dirtyTextFlag = true;
+        }
       }
     }
 
@@ -142,19 +155,29 @@ namespace DRaumServerApp
     {
       lock (this.textMutex)
       {
-        this.postText = text;
+        if (!text.Equals(this.postText))
+        {
+          this.postText = text;
+          this.dirtyTextFlag = true;
+        }
       }      
     }
 
     internal void calculateDaysToDelete()
     {
+      int newDays = 0;
       if(this.isTopPost)
       {
-        this.daysBeforeDelete = DAYSUNTILDELETENORMAL + (int)((float)(this.getUpVotePercentage() - 50) * 1.5);
+        newDays = DAYSUNTILDELETENORMAL + (int)((float)(this.getUpVotePercentage() - 50) * 1.5);
       }
       else
       {
-        this.daysBeforeDelete = DAYSUNTILDELETENORMAL + (int)((float)(this.getUpVotePercentage() - 50) * 1.2);
+        newDays = DAYSUNTILDELETENORMAL + (int)((float)(this.getUpVotePercentage() - 50) * 1.2);
+      }
+      if (newDays != this.daysBeforeDelete)
+      {
+        this.daysBeforeDelete = newDays;
+        this.dirtyTextFlag = true;
       }
     }
 
@@ -162,7 +185,10 @@ namespace DRaumServerApp
     {
       lock (this.publishTimestampMutex)
       {
-        return "<i>Veröffentlicht am " + this.publishTimestamp.ToShortDateString() + " um " + this.publishTimestamp.ToShortTimeString() + " Uhr</i>";
+        string result = "<i>Veröffentlicht am " + this.publishTimestamp.ToShortDateString() + " um " + this.publishTimestamp.ToShortTimeString() + " Uhr</i>";
+        TimeSpan ts = this.publishTimestamp.AddDays(this.daysBeforeDelete) - DateTime.Now;
+        result += "\r\n" + "<i>Wird in " + ((int)ts.TotalDays).ToString() + " Tagen gelöscht</i>";
+        return result;
       }
     }
 
@@ -198,11 +224,22 @@ namespace DRaumServerApp
       return true;
     }
 
+    internal void setTopPostStatus(bool status)
+    {
+      if (this.isTopPost != status)
+      {
+        this.isTopPost = status;
+        calculateDaysToDelete();
+        this.dirtyTextFlag = true;
+      }
+    }
+
     internal void voteup(long userID, int votecount)
     {
       lock (this.upvoteMutex)
       {
         this.upVotes = this.upVotes + votecount;
+        calculateDaysToDelete();
         this.dirtyFlag = true;
       }      
       this.votedUsers.Add(userID);
@@ -213,6 +250,7 @@ namespace DRaumServerApp
       lock (this.downvoteMutex)
       {
         this.downVotes = this.downVotes + votecount;
+        calculateDaysToDelete();
         this.dirtyFlag = true;
       }
       this.votedUsers.Add(userID);
@@ -226,6 +264,16 @@ namespace DRaumServerApp
     internal void resetDirtyFlag()
     {
       this.dirtyFlag = false;
+    }
+
+    internal bool isTextDirty()
+    {
+      return this.dirtyTextFlag;
+    }
+
+    internal void resetTextDirtyFlag()
+    {
+      this.dirtyTextFlag = false;
     }
 
     internal void flag(long userID)
@@ -277,6 +325,26 @@ namespace DRaumServerApp
     internal int getChatMessageID()
     {
       return this.chatMessageId;
+    }
+
+    internal void setChatMessageDailyID(int messageId)
+    {
+      this.chatMessageDailyId = messageId;
+    }
+
+    internal int getChatMessageDailyID()
+    {
+      return this.chatMessageDailyId;
+    }
+
+    internal void setChatMessageWeeklyID(int messageId)
+    {
+      this.chatMessageWeeklyId = messageId;
+    }
+
+    internal int getChatMessageWeeklyID()
+    {
+      return this.chatMessageWeeklyId;
     }
   }
 }

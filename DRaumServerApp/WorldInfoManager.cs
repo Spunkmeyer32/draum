@@ -35,9 +35,9 @@ namespace DRaumServerApp
 
     public String getInfoStringForChat()
     {
-      if ((DateTime.Now - lastCheck).TotalHours >= 24.0 || this.infoString.Length < 10)
+      if ((DateTime.Now - this.lastCheck).TotalHours >= 24.0 || this.infoString.Length < 10)
       {
-        lastCheck = DateTime.Now;
+        this.lastCheck = DateTime.Now;
         // Daten einholen und in infoString speichern
         try
         {

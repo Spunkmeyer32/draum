@@ -232,18 +232,18 @@ namespace DRaumServerApp
     internal int voteUpAndGetCount()
     {
       this.exp += EXP_FOR_VOTE;
-      if (votingGauge <= 0)
+      if (this.votingGauge <= 0)
       {
-        votingGauge += 1;
+        this.votingGauge += 1;
         return 10;
       }
       else
       {
-        int result = Math.Max(10 - (votingGauge / 2), 5);
-        votingGauge += 1;
-        if (votingGauge > 10)
+        int result = Math.Max(10 - (this.votingGauge / 2), 5);
+        this.votingGauge += 1;
+        if (this.votingGauge > 10)
         {
-          votingGauge = 10;
+          this.votingGauge = 10;
         }
         return result;
       }
@@ -252,18 +252,18 @@ namespace DRaumServerApp
     internal int voteDownAndGetCount()
     {
       this.exp += EXP_FOR_VOTE;
-      if (votingGauge >= 0)
+      if (this.votingGauge >= 0)
       {
-        votingGauge -= 1;
+        this.votingGauge -= 1;
         return 10;
       }
       else
       {
-        int result = Math.Max(10 + (votingGauge), 1);
-        votingGauge -= 1;
-        if (votingGauge < -10)
+        int result = Math.Max(10 + (this.votingGauge), 1);
+        this.votingGauge -= 1;
+        if (this.votingGauge < -10)
         {
-          votingGauge = -10;
+          this.votingGauge = -10;
         }
         return result;
       }

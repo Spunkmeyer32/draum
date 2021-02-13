@@ -13,6 +13,8 @@ namespace DRaumServerApp
     private readonly object dataMutexFeedback = new object();
     [JsonIgnore]
     private int moderateMessageID = -1;
+    [JsonIgnore]
+    private int adminStatisticMessageID = -1;
 
     [JsonProperty]
     private ConcurrentQueue<FeedbackElement> feedBacks;
@@ -63,6 +65,16 @@ namespace DRaumServerApp
     internal void setModerateMessageID(int messageID)
     {
       this.moderateMessageID = messageID;
+    }
+
+    internal int getAdminStatisticMessageID()
+    {
+      return this.adminStatisticMessageID;
+    }
+
+    internal void setAdminStatisticMessageID(int messageID)
+    {
+      this.adminStatisticMessageID = messageID;
     }
 
     internal void waitForModerationText(long id)

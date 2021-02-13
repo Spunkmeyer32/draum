@@ -37,7 +37,7 @@ namespace DRaumServerApp
     {
       if (this.authors.ContainsKey(authorID))
       {
-        return authors[authorID];
+        return this.authors[authorID];
       }
       return null;
     }
@@ -46,11 +46,11 @@ namespace DRaumServerApp
     {
       if (this.authors.ContainsKey(authorID))
       {
-        return authors[authorID];
+        return this.authors[authorID];
       }
       else
       {
-        if (this.authors.Count < AuthorManager.MAXMANAGEDUSERS)
+        if (this.authors.Count < MAXMANAGEDUSERS)
         {
           if (externalName == null)
           {

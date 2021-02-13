@@ -10,9 +10,12 @@ using System.Threading.Tasks;
 using System.Threading;
 using Telegram.Bot.Types;
 using System.Collections;
+using System.Diagnostics.Contracts;
+using DRaumServerApp.telegram;
+using Telegram.Bot.Types.Enums;
 
 
-/**
+/*
 
 Willkommen in der Kommentarspalte des Internets auf Telegram ;-)
 
@@ -22,17 +25,19 @@ Meine Idee:
 Auf Twitter kann man gut Stimmungen einzelner Echokammern/Filterblasen verfolgen.
 Das verzerrt aufgrund der eigenen Filterblase und durch Blockierungen jedoch das Gesamtbild.
 
-Hier in diesem digitalen Raum auf Telegram sollen Meinungen aus verschiedenen 
+Hier in diesem D-Raum auf Telegram sollen Meinungen aus verschiedenen 
 Echokammern zusammentreffen und bewertet werden um ein übergreifendes Stimmungsbild zu zeigen. 
+(Das D steht für vieles, suche dir was aus)
+
 Damit dies gelingt, sind ein paar Regeln einzuhalten:
 
-Die Texte hier sollen Kommentare sein, keine Kopien von Nachrichten im Netz.
+Die Texte hier sollen Kommentare sein, keine Kopien von Nachrichten im Netz (Urheberrecht und Sinn eines Meinungsforums).
 Sie sollen nicht gegen Gesetze verstoßen, sonst wird der Kanal zu gemacht.
 Keine offene Hetze oder persönliche Beleidigungen. Damit das auch eingehalten wird,
 moderiere ich die Beiträge (nur freischalten oder mit Änderungen, die der Autor oder die Autorin bestätigen muss).
 
 Damit keine Fan-Basis und Echokammern entstehen werden die Beiträge und die 
-Bewertungen anonymisiert. Gegen Spam arbeitet im Hintergrund ein Bot-Program, welches stetig 
+Bewertungen anonymisiert. Gegen Spam arbeitet im Hintergrund ein Bot-Programm, welches stetig 
 verbessert wird. Zur Zeit ist eine Beitragsrate von 20 Minuten eingestellt. Wer etwas schreibt, bekommt den 
 nächsten freien Veröffentlichungs-Slot zugeteilt und angezeigt.
 
@@ -51,6 +56,12 @@ Tom
 
 */
 
+/*
+ * 1 message per chat per second
+ * 30 interactions per second per bot
+ * 20 messages per minute per group
+ */
+
 namespace DRaumServerApp
 {
   public class FileDateComparer : IComparer
@@ -61,7 +72,7 @@ namespace DRaumServerApp
     }
   }
 
-  class DRaumManager
+  internal class DRaumManager
   {
     #region dynamicmembers
     private static readonly NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
@@ -73,6 +84,8 @@ namespace DRaumServerApp
     private FeedbackManager feedbackManager;
 
     private readonly WorldInfoManager worldInfoManager = new WorldInfoManager();
+
+    private readonly FeedbackBufferedSending feedbackBufferedSending;
 
     // Telegram Bots
     private readonly TelegramBotClient telegramInputBot;
@@ -89,6 +102,9 @@ namespace DRaumServerApp
     private readonly long draumDailyChatId;
     private readonly long draumWeeklyChatId;
 
+    private string adminStatisticText = "";
+    private DateTime lastBackup = new DateTime(2000,1,1);
+
     #endregion
 
     // Statische Optionen
@@ -98,18 +114,18 @@ namespace DRaumServerApp
     private static readonly String writecommand = "schreiben";
     private static readonly String feedbackcommand = "nachricht";
 
-    private static readonly String modAcceptPrefix = "Y";
+    internal static readonly String modAcceptPrefix = "Y";
     private static readonly String modEditPrefix = "M";
-    private static readonly String modBlockPrefix = "N";
-    private static readonly String modGetNextCheckPostPrefix = "G";
+    internal static readonly String modBlockPrefix = "N";
+    internal static readonly String modGetNextCheckPostPrefix = "G";
     private static readonly String modDeletePrefix = "R";
     private static readonly String modClearFlagPrefix = "C";
 
     private static readonly String genericMessageDeletePrefix = "X";
 
-    private static readonly String voteUpPrefix = "U";
-    private static readonly String voteDownPrefix = "D";
-    private static readonly String flagPrefix = "F";
+    internal static readonly String voteUpPrefix = "U";
+    internal static readonly String voteDownPrefix = "D";
+    internal static readonly String flagPrefix = "F";
 
     private static readonly Telegram.Bot.Types.Enums.UpdateType[] receivefilterCallbackAndMessage = { Telegram.Bot.Types.Enums.UpdateType.CallbackQuery, Telegram.Bot.Types.Enums.UpdateType.Message };
     private static readonly Telegram.Bot.Types.Enums.UpdateType[] receivefilterCallbackOnly = { Telegram.Bot.Types.Enums.UpdateType.CallbackQuery, Telegram.Bot.Types.Enums.UpdateType.Message };
@@ -119,7 +135,7 @@ namespace DRaumServerApp
     // Tasks und Intervalle für das regelmäßige Abarbeiten von Aufgaben
     private static readonly int intervalCheckPublishSeconds = 15;
     private static readonly int intervalBackUpDataMinutes = 45;
-    private static readonly int intervalVoteAndFlagCountMinutes = 2;
+    private static readonly int intervalVoteAndFlagCountMinutes = 2; // 15
     private static readonly int intervalpostcheckMilliseconds = 250;
     private static readonly int intervalStatisticCollectionMinutes = 60;
 
@@ -144,12 +160,13 @@ namespace DRaumServerApp
       "Folgende Anforderungen sind zu erfüllen: \r\nTextlänge zwischen 100 und 1000\r\nKeine URLs\r\nKeine Schimpfworte und " +
       "ähnliches. Ihre User-ID wird für eine eventuelle Rückmeldung gespeichert.";
 
-    private static readonly String noModeChosen = "Willkommen. Es ist zur Zeit kein Modus gewählt. Mit /" + writecommand + " kann man Beiträge abschicken. Mit /" + feedbackcommand + " kann man " +
-      "den Moderatoren und Kanalbetreibern eine Nachricht hinterlassen (Feedback/Wünsche/Kritik).";
+    private static readonly String noModeChosen = "Willkommen. Es ist zur Zeit kein Modus gewählt! Mit /" + writecommand + " schaltet man in den Beitrag-Schreiben-Modus. Mit /" + 
+                                                  feedbackcommand + " kann man " +  "in den Feedback-Modus gelangen und den Moderatoren und Kanalbetreibern eine Nachricht "+
+                                                  "hinterlassen (Feedback/Wünsche/Kritik).";
 
     private static readonly String replyPost = "Danke für den Beitrag. Er wird geprüft und vor der Freigabe nochmal an Sie verschickt zum gegenlesen. Dies kann dauern, bitte Geduld.";
 
-    private static readonly String replyFeedback = "Danke für das Feedback. Es wird nun von Moderatoren und Kanalbetreiber gelesen. Sie erhalten eventuell eine Rückmeldung.";
+    private static readonly String replyFeedback = "Danke für das Feedback. Es wird nun von Moderatoren und Kanalbetreiber gelesen. Sie erhalten eventuell hier eine Rückmeldung.";
 
     internal DRaumManager()
     {
@@ -182,7 +199,7 @@ namespace DRaumServerApp
       logger.Info("Lade Feedback-Manager");
       this.feedbackManager = new FeedbackManager();
 
-      if(!loadDataFromFiles())
+      if(!this.loadDataFromFiles())
       {
         this.telegramAdminBot.SendTextMessageAsync(chatId: this.adminChatId, text: "!!! Server ist ohne Daten gestartet !!!");
         logger.Info("Lade Autor-Manager neu");
@@ -199,7 +216,7 @@ namespace DRaumServerApp
       Update[] updates = taskInput.Result;
       if (updates.Length > 0)
       {
-        this.telegramInputBot.MessageOffset = updates[updates.Length - 1].Id+1;
+        this.telegramInputBot.MessageOffset = updates[updates.Length - 1].Id + 1;
       }
       updates = taskModerate.Result;
       if (updates.Length > 0)
@@ -246,6 +263,8 @@ namespace DRaumServerApp
       this.telegramAdminBot.OnReceiveGeneralError += this.onReceiveGeneralError;
       this.telegramAdminBot.StartReceiving(receivefilterCallbackOnly);
 
+      this.feedbackBufferedSending = new FeedbackBufferedSending(this.feedbackManager, this.telegramFeedbackBot, this.feedbackChatId);
+
       logger.Info("Starte periodische Aufgaben");
       this.backupTask = this.periodicBackupTask(new TimeSpan(0, intervalBackUpDataMinutes, 0), this.cancelTasksSource.Token);
       this.publishTask = this.periodicPublishTask(new TimeSpan(0, 0, intervalCheckPublishSeconds), this.cancelTasksSource.Token);
@@ -271,7 +290,9 @@ namespace DRaumServerApp
         {
           break;
         }
-        voteFlagTask();
+       
+        this.voteFlagTask();
+        
       }
       logger.Info("Voting-Flagging-Task ist beendet");
     }
@@ -293,7 +314,8 @@ namespace DRaumServerApp
         {
           break;
         }
-        statisticCollectionTask();
+
+        this.statisticCollectionTask();
       }
       logger.Info("Statistik-Task ist beendet");
     }
@@ -315,7 +337,8 @@ namespace DRaumServerApp
         {
           break;
         }
-        inputCheckTask();
+
+        this.inputCheckTask();
       }
       logger.Info("Input-Check-Task ist beendet");
     }
@@ -337,7 +360,8 @@ namespace DRaumServerApp
         {
           break;
         }
-        publishingTask();
+
+        this.publishingTask();
       }
       logger.Info("Publish-Task ist beendet");
     }
@@ -359,9 +383,34 @@ namespace DRaumServerApp
         {
           break;
         }
-        await backUpTask();
+        await this.backUpTask();
       }
       logger.Info("Backup-Task ist beendet");
+    }
+
+    private async void checkAndUpdateAdminStatistic()
+    {
+      String newtext = "Interaktionen im letzten Intervall: " + this.statistics.getLastInteractionIntervalCount();
+      newtext += "Letztes Backup: " + this.lastBackup.ToString(Utilities.usedCultureInfo);
+      if (!newtext.Equals(this.adminStatisticText))
+      {
+        this.adminStatisticText = newtext;
+        int msgId = this.feedbackManager.getAdminStatisticMessageID();
+        if (msgId == -1)
+        {
+          Message msg = this.telegramAdminBot.SendTextMessageAsync(
+            chatId: this.adminChatId,
+            text: this.adminStatisticText).Result;
+          this.feedbackManager.setAdminStatisticMessageID(msg.MessageId);
+        }
+        else
+        {
+          await this.telegramAdminBot.EditMessageTextAsync(
+            chatId: this.adminChatId,
+            messageId: msgId,
+            text: this.adminStatisticText);
+        }
+      }
     }
 
     private void statisticCollectionTask()
@@ -370,9 +419,7 @@ namespace DRaumServerApp
       try
       {
         this.statistics.switchInteractionInterval();
-        Message msg = this.telegramAdminBot.SendTextMessageAsync(
-          chatId: adminChatId,
-          text: "Interaktionen im letzten Intervall: " + this.statistics.getLastInteractionIntervalCount()).Result;
+        checkAndUpdateAdminStatistic();
       }
       catch(Exception e)
       {
@@ -382,18 +429,12 @@ namespace DRaumServerApp
 
     private void inputCheckTask()
     {
-      // Eingehende Posts bearbeiten
+      // Eingehende, zu moderierende Posts bearbeiten
       if (this.posts.getAndResetPostsCheckChangeFlag())
       {
         int messageID = this.feedbackManager.getModerateMessageID();
         int postsToCheck = this.posts.howManyPostsToCheck();
         String message = "Es gibt " + postsToCheck + " Posts zu moderieren.";
-        InlineKeyboardButton getNextModPostButton = InlineKeyboardButton.WithCallbackData("Beitrag laden", modGetNextCheckPostPrefix + "0");
-        List<InlineKeyboardButton> buttonlist = new List<InlineKeyboardButton>
-        {
-          getNextModPostButton
-        };
-        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup(buttonlist);
         if (messageID == -1)
         {
           // Gibt noch keine Moderator-Message, neu Anlegen
@@ -402,9 +443,10 @@ namespace DRaumServerApp
             Message msg = this.telegramModerateBot.SendTextMessageAsync(
               chatId: this.moderateChatId,
               text: message,
-              replyMarkup: keyboard).Result;
+              replyMarkup: Keyboards.getGetNextPostToModerateKeyboard()).Result;
             this.feedbackManager.setModerateMessageID(msg.MessageId);
-          }catch(Exception e)
+          }
+          catch(Exception e)
           {
             logger.Error(e, "Fehler beim Anlegen der Moderations-Nachricht");
           }
@@ -414,11 +456,11 @@ namespace DRaumServerApp
           // Update der Message
           try
           {
-            Message msg = this.telegramModerateBot.EditMessageTextAsync (
+             _ = this.telegramModerateBot.EditMessageTextAsync (
               chatId: this.moderateChatId,
               messageId: messageID,
               text: message,
-              replyMarkup: keyboard).Result;
+              replyMarkup: Keyboards.getGetNextPostToModerateKeyboard()).Result;
           }
           catch (Exception e)
           {
@@ -426,76 +468,55 @@ namespace DRaumServerApp
           }
         }
       }
-      // erhaltene Feedbacks verarbeiten, wenn grad keine Antwort geschrieben wird
-      if (this.feedbackManager.feedBackAvailable() && !this.feedbackManager.isWaitingForFeedbackReply())
-      {
-        FeedbackElement feedback = this.feedbackManager.dequeueFeedback();
-        if (feedback.text.Length > 10)
-        {
-          InlineKeyboardButton replyButton = InlineKeyboardButton.WithCallbackData("Antworten", modAcceptPrefix + feedback.chatID);
-          InlineKeyboardButton dismissButton = InlineKeyboardButton.WithCallbackData("Verwerfen", modBlockPrefix + feedback.chatID);
-
-          List<InlineKeyboardButton> buttonlist = new List<InlineKeyboardButton>
-          {
-            replyButton,
-            dismissButton
-          };
-          InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup(buttonlist);
-          try
-          {
-            Message msg = this.telegramFeedbackBot.SendTextMessageAsync(
-              chatId: this.feedbackChatId,
-              text: feedback.text,
-              replyMarkup: keyboard
-            ).Result;
-          }
-          catch(Exception ex)
-          {
-            logger.Error(ex, "Fehler beim senden der Feedback-Nachricht");
-          }
-        }
-        else
-        {
-          logger.Warn("Ein Feedback wurde nicht verarbeitet (kürzer als 10 zeichen, bug?)...");
-        }
-      }
+      
     }
 
-    private void voteFlagTask()
+    private async void voteFlagTask()
     {
-      // Posts prüfen, ob der Text im Chat angepasst werden muss
+      // Posts prüfen, ob Buttons im Chat angepasst werden müssen
       IEnumerable<long> dirtyposts = this.posts.getDirtyPosts();
       foreach (long postID in dirtyposts)
       {
-        // update text
-        int upvotePercentage = this.posts.getUpVotePercentage(postID);
-        int downvotePercentage = 100 - upvotePercentage;
-        InlineKeyboardButton thumbsUpButton = InlineKeyboardButton.WithCallbackData("👍 " + upvotePercentage + "%", voteUpPrefix + postID);
-        InlineKeyboardButton thumbsDownButton = InlineKeyboardButton.WithCallbackData("👎 " + downvotePercentage + "%", voteDownPrefix + postID);
-        InlineKeyboardButton flagButton = InlineKeyboardButton.WithCallbackData("🚩 Melden", flagPrefix + postID);
-        List<InlineKeyboardButton> buttonlist = new List<InlineKeyboardButton>
-        {
-          thumbsUpButton,
-          thumbsDownButton,
-          flagButton
-        };
-        InlineKeyboardMarkup updatedKeyboard = new InlineKeyboardMarkup(buttonlist);
-
-        logger.Debug("Ein Post wird aktualisiert");
+        logger.Debug("Buttons eines Posts werden aktualisiert");
         try
         {
           Message msg = this.telegramPublishBot.EditMessageReplyMarkupAsync(
             chatId: this.draumChatId,
             messageId: this.posts.getMessageID(postID),
-            replyMarkup: updatedKeyboard).Result;
-          logger.Debug(msg.ToString());
+            replyMarkup: Keyboards.getPostKeyboard(this.posts.getUpVotePercentage(postID), postID)).Result;
           this.posts.resetDirtyFlag(postID);
+          await Task.Delay(3000);
         }
         catch (Exception ex)
         {
-          logger.Error(ex, "Beim aktualisieren eines Beitrags trat ein Fehler auf.");
+          logger.Error(ex, "Beim aktualisieren eines Buttons eines Beitrags trat ein Fehler auf.");
         }
       }
+
+      // Posts prüfen, ob Texte im Chat angepasst werden müssen
+      dirtyposts = this.posts.getTextDirtyPosts();
+      foreach (long postID in dirtyposts)
+      {
+        logger.Debug("Text eines Posts wird aktualisiert");
+        try
+        {
+          Message msg = this.telegramPublishBot.EditMessageTextAsync(
+            chatId: this.draumChatId,
+            parseMode: ParseMode.Html,
+            replyMarkup: Keyboards.getPostKeyboard(this.posts.getUpVotePercentage(postID), postID),
+            messageId: this.posts.getMessageID(postID),
+            text: this.buildPostingText(postID)).Result;
+          this.posts.resetTextDirtyFlag(postID);
+          await Task.Delay(3000);
+        }
+        catch (Exception ex)
+        {
+          logger.Error(ex, "Beim aktualisieren eines Textes eines Beitrags trat ein Fehler auf.");
+        }
+      }
+
+
+
       // Prüfen, ob ein Flag vorliegt und dem Admin melden
       IEnumerable<long> flaggedPosts = this.posts.getFlaggedPosts();
       foreach (long postID in flaggedPosts)
@@ -514,7 +535,7 @@ namespace DRaumServerApp
         try
         {
           Message msg = this.telegramAdminBot.SendTextMessageAsync(
-            chatId: adminChatId,
+            chatId: this.adminChatId,
             text: msgText,
             replyMarkup: keyboard).Result;
         }
@@ -529,16 +550,26 @@ namespace DRaumServerApp
     {
       try
       {
+        logger.Debug("Anhalten für Backup");
         this.telegramInputBot.StopReceiving();
         this.telegramModerateBot.StopReceiving();
         this.telegramPublishBot.StopReceiving();
         this.telegramFeedbackBot.StopReceiving();
+        ManualResetEvent mre = new ManualResetEvent(false);
+        SyncManager.halt(mre);
+        if (!mre.WaitOne(TimeSpan.FromMinutes(3)))
+        {
+          logger.Error("Die Tasks sind nicht alle angehalten!");
+        }
         this.backupData();
         this.telegramInputBot.StartReceiving(receivefilterCallbackAndMessage);
         this.telegramModerateBot.StartReceiving(receivefilterCallbackAndMessage);
         this.telegramPublishBot.StartReceiving(receivefilterCallbackOnly);
         this.telegramFeedbackBot.StartReceiving(receivefilterCallbackAndMessage);
-        await this.telegramAdminBot.SendTextMessageAsync(chatId: this.adminChatId, text: "Backup durchgeführt!");
+        SyncManager.unhalt();
+        logger.Debug("Backup erledigt, weitermachen");
+        this.lastBackup = DateTime.Now;
+        this.checkAndUpdateAdminStatistic();
       }
       catch(Exception e)
       {
@@ -548,10 +579,11 @@ namespace DRaumServerApp
 
     private async void publishingTask()
     {
-      if( (DateTime.Now - lastWorldNewsPost).TotalHours > 24.0 )
+      // News-Post
+      if( (DateTime.Now - this.lastWorldNewsPost).TotalHours > 24.0 )
       {
-        lastWorldNewsPost = new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day, 9, 0, 0);
-        logger.Info("Nächste News am " + lastWorldNewsPost.AddHours(24).ToString());
+        this.lastWorldNewsPost = new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day, 9, 0, 0);
+        logger.Info("Nächste News am " + this.lastWorldNewsPost.AddHours(24).ToString(Utilities.usedCultureInfo));
         String news = this.worldInfoManager.getInfoStringForChat();
         try
         {
@@ -564,22 +596,28 @@ namespace DRaumServerApp
           logger.Error(e, "Fehler beim Posten der News");
         }
       }
-      if ((DateTime.Now - lastTopDaily).TotalHours > 24.0)
+      // Top-Daily
+      if ((DateTime.Now - this.lastTopDaily).TotalHours > 24.0)
       {
-        lastTopDaily = new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day, 9, 0, 0);
-        logger.Info("Nächste Top Tages Posts am " + lastTopDaily.AddHours(24).ToString());
+        this.lastTopDaily = new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day, 9, 0, 0);
+        logger.Info("Nächste Top Tages Posts am " + this.lastTopDaily.AddHours(24).ToString(Utilities.usedCultureInfo));
 
-        List<Posting> topPosts = this.posts.getDailyTopPostsFromYesterday(); 
+        List<Posting> topPosts = this.posts.getDailyTopPostsFromYesterday();
 
 
+
+        // https://t.me/d_raum/56 
         /// TODO Top Daily
         /// 
         //await this.telegramPublishBot.ForwardMessageAsync(chatId: draumDailyChatId, fromChatId: draumChatId, 3);
 
+
+
         /// TODO Alte Sachen löschen
 
       }
-      if ((DateTime.Now - lastTopWeekly).TotalDays > 7.0)
+      // Top-Weekly
+      if ((DateTime.Now - this.lastTopWeekly).TotalDays > 7.0)
       {
         DayOfWeek currentDay = DateTime.Now.DayOfWeek;
         int daysTillCurrentDay = currentDay - DayOfWeek.Saturday;
@@ -588,8 +626,8 @@ namespace DRaumServerApp
           daysTillCurrentDay += 7;
         }
         DateTime currentWeekStartDate = DateTime.Now.AddDays(-daysTillCurrentDay);
-        lastTopWeekly = new DateTime(currentWeekStartDate.Year, currentWeekStartDate.Month, currentWeekStartDate.Day, 9, 0, 0);
-        logger.Info("Nächste Top Wochen Posts am " + lastTopWeekly.AddDays(7).ToString());
+        this.lastTopWeekly = new DateTime(currentWeekStartDate.Year, currentWeekStartDate.Month, currentWeekStartDate.Day, 9, 0, 0);
+        logger.Info("Nächste Top Wochen Posts am " + this.lastTopWeekly.AddDays(7).ToString(Utilities.usedCultureInfo));
 
 
         /// TODO Top Weekly
@@ -601,6 +639,7 @@ namespace DRaumServerApp
 
 
       long postID = -1;
+      bool fail = false;
       try
       {
         Posting toPublish = this.posts.tryPublish();
@@ -609,34 +648,35 @@ namespace DRaumServerApp
           postID = toPublish.getPostID();
           // Ab in den D-Raum damit
           logger.Debug("Es soll folgender Post veröffentlicht werden: " + postID);
-          int upvotePercentage = toPublish.getUpVotePercentage();
-          int downvotePercentage = 100 - upvotePercentage;
-          InlineKeyboardButton thumbsUpButton = InlineKeyboardButton.WithCallbackData("👍 " + upvotePercentage + "%", voteUpPrefix + postID);
-          InlineKeyboardButton thumbsDownButton = InlineKeyboardButton.WithCallbackData("👎 " + downvotePercentage + "%", voteDownPrefix + postID);
-          InlineKeyboardButton flagButton = InlineKeyboardButton.WithCallbackData("🚩 Melden", flagPrefix + postID);
-
-          List<InlineKeyboardButton> buttonlist = new List<InlineKeyboardButton>
-          {
-            thumbsUpButton,
-            thumbsDownButton,
-            flagButton
-          };
-          InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup(buttonlist);
-          Telegram.Bot.Types.Message result = this.telegramPublishBot.SendTextMessageAsync(
+          Message result = this.telegramPublishBot.SendTextMessageAsync(
             chatId: this.draumChatId,
             parseMode: Telegram.Bot.Types.Enums.ParseMode.Html,
-            text: this.buildPostingText(toPublish),
-            replyMarkup: keyboard
+            text: this.buildPostingText(postID),
+            replyMarkup: Keyboards.getPostKeyboard(toPublish.getUpVotePercentage(),postID)
           ).Result;
-          toPublish.setChatMessageID(result.MessageId);
+          if (result == null || result.MessageId == 0)
+          {
+            logger.Error("Fehler beim Publizieren des Posts (keine msg ID) bei Post " + postID);
+          }
+          else
+          {
+            toPublish.resetTextDirtyFlag();
+            toPublish.resetDirtyFlag();
+            toPublish.setChatMessageID(result.MessageId);
+          }
         }
       }
       catch (Exception e)
       {
-        logger.Error(e, "Fehler beim Publizieren des Posts: " + postID);
+        logger.Error(e, "(Exception)Fehler beim Publizieren des Posts: " + postID);
         await this.telegramAdminBot.SendTextMessageAsync(
-          chatId: adminChatId,
+          chatId: this.adminChatId,
           text: "Fehler beim Publizieren des Posts: " + postID);
+        fail = true;
+      }
+      if (fail)
+      {
+        // TODO den Post wieder einreihen
       }
     }
 
@@ -644,12 +684,14 @@ namespace DRaumServerApp
     {
       logger.Info("ShutDown läuft, Aufgaben werden abgebrochen, Listener werden beendet, Backup wird erstellt");
       this.cancelTasksSource.Cancel();
+      this.feedbackBufferedSending.shutDownTask();
       try
       {
         await this.backupTask;
         await this.publishTask;
         await this.postAndFeedbackCheckingTask;
         await this.votingFlaggingTask;
+        await this.statisticCollectTask;
       }
       catch (OperationCanceledException e)
       {
@@ -665,7 +707,7 @@ namespace DRaumServerApp
       this.telegramPublishBot.StopReceiving();
       this.telegramFeedbackBot.StopReceiving();
       this.telegramAdminBot.SendTextMessageAsync(chatId: this.adminChatId, text: "Server ist beendet!").Wait();
-      backupData();
+      this.backupData();
     }
 
     private String getDateFileString()
@@ -678,7 +720,7 @@ namespace DRaumServerApp
     {
       // Suche im Backup-Ordner nach dem neuesten Satz backupdateien
       String dateprefix = "";
-      DirectoryInfo di = new DirectoryInfo(DRaumManager.backupFolder);
+      DirectoryInfo di = new DirectoryInfo(backupFolder);
       if(di.Exists)
       {
         FileInfo[] filelist = di.GetFiles();
@@ -694,7 +736,7 @@ namespace DRaumServerApp
               filelist[lastindex].Name.Substring(0, 18).Equals(filelist[lastindex - 3].Name.Substring(0, 18)) )
           {
             validFound = true;
-            dateprefix = filelist[lastindex].Name.Substring(0, filelist[lastindex].Name.IndexOf(filePrefix));
+            dateprefix = filelist[lastindex].Name.Substring(0, filelist[lastindex].Name.IndexOf(filePrefix, StringComparison.Ordinal));
             logger.Info("Lade die Daten aus diesen Dateien: " + filelist[lastindex].Name);
             if(lastindex != filelist.Length-1)
             {
@@ -708,29 +750,29 @@ namespace DRaumServerApp
           return false;
         }        
       }
-      System.IO.FileStream inputFilestream = null;
+      FileStream inputFilestream = null;
       try
       {
         logger.Info("Lese Autoren-Daten aus dem Dateisystem");
-        inputFilestream = System.IO.File.OpenRead(DRaumManager.backupFolder + Path.DirectorySeparatorChar + dateprefix + DRaumManager.filePrefix + "authors.json");
+        inputFilestream = System.IO.File.OpenRead(backupFolder + Path.DirectorySeparatorChar + dateprefix + filePrefix + "authors.json");
         StreamReader sr = new StreamReader(inputFilestream);
         String jsonstring = sr.ReadToEnd();
         sr.Close();
         this.authors = JsonConvert.DeserializeObject<AuthorManager>(jsonstring);
         logger.Info("Lese Post-Daten aus dem Dateisystem");
-        inputFilestream = System.IO.File.OpenRead(DRaumManager.backupFolder + Path.DirectorySeparatorChar + dateprefix + DRaumManager.filePrefix + "posts.json");
+        inputFilestream = System.IO.File.OpenRead(backupFolder + Path.DirectorySeparatorChar + dateprefix + filePrefix + "posts.json");
         sr = new StreamReader(inputFilestream);
         jsonstring = sr.ReadToEnd();
         sr.Close();
         this.posts = JsonConvert.DeserializeObject<PostingManager>(jsonstring);
         logger.Info("Lese Statistik-Daten aus dem Dateisystem");
-        inputFilestream = System.IO.File.OpenRead(DRaumManager.backupFolder + Path.DirectorySeparatorChar + dateprefix + DRaumManager.filePrefix + "statistic.json");
+        inputFilestream = System.IO.File.OpenRead(backupFolder + Path.DirectorySeparatorChar + dateprefix + filePrefix + "statistic.json");
         sr = new StreamReader(inputFilestream);
         jsonstring = sr.ReadToEnd();
         sr.Close();
         this.statistics = JsonConvert.DeserializeObject<DRaumStatistics>(jsonstring);
         logger.Info("Lese Feedback-Daten aus dem Dateisystem");
-        inputFilestream = System.IO.File.OpenRead(DRaumManager.backupFolder + Path.DirectorySeparatorChar + dateprefix + DRaumManager.filePrefix + "feedback.json");
+        inputFilestream = System.IO.File.OpenRead(backupFolder + Path.DirectorySeparatorChar + dateprefix + filePrefix + "feedback.json");
         sr = new StreamReader(inputFilestream);
         jsonstring = sr.ReadToEnd();
         sr.Close();
@@ -753,32 +795,32 @@ namespace DRaumServerApp
 
     internal void backupData()
     {
-      System.IO.FileStream backupfile = null;
+      FileStream backupfile = null;
       try
       {
-        DirectoryInfo di = new DirectoryInfo(DRaumManager.backupFolder);
+        DirectoryInfo di = new DirectoryInfo(backupFolder);
         if (!di.Exists)
         {
           di.Create();
         }
         String datestring = this.getDateFileString();
         logger.Info("Schreibe Post-Daten ins Dateisystem");
-        backupfile = System.IO.File.Create(DRaumManager.backupFolder + Path.DirectorySeparatorChar + datestring + DRaumManager.filePrefix + "posts.json");
+        backupfile = System.IO.File.Create(backupFolder + Path.DirectorySeparatorChar + datestring + filePrefix + "posts.json");
         StreamWriter sr = new StreamWriter(backupfile);
         sr.Write(JsonConvert.SerializeObject(this.posts,Formatting.Indented));
         sr.Close();
         logger.Info("Schreibe Autoren-Daten ins Dateisystem");
-        backupfile = System.IO.File.Create(DRaumManager.backupFolder + Path.DirectorySeparatorChar + datestring + DRaumManager.filePrefix + "authors.json");
+        backupfile = System.IO.File.Create(backupFolder + Path.DirectorySeparatorChar + datestring + filePrefix + "authors.json");
         sr = new StreamWriter(backupfile);
         sr.Write(JsonConvert.SerializeObject(this.authors, Formatting.Indented));
         sr.Close();
         logger.Info("Schreibe Statistik-Daten ins Dateisystem");
-        backupfile = System.IO.File.Create(DRaumManager.backupFolder + Path.DirectorySeparatorChar + datestring + DRaumManager.filePrefix + "statistic.json");
+        backupfile = System.IO.File.Create(backupFolder + Path.DirectorySeparatorChar + datestring + filePrefix + "statistic.json");
         sr = new StreamWriter(backupfile);
         sr.Write(JsonConvert.SerializeObject(this.statistics, Formatting.Indented));
         sr.Close();
         logger.Info("Schreibe Feedback-Daten ins Dateisystem");
-        backupfile = System.IO.File.Create(DRaumManager.backupFolder + Path.DirectorySeparatorChar + datestring + DRaumManager.filePrefix + "feedback.json");
+        backupfile = System.IO.File.Create(backupFolder + Path.DirectorySeparatorChar + datestring + filePrefix + "feedback.json");
         sr = new StreamWriter(backupfile);
         sr.Write(JsonConvert.SerializeObject(this.feedbackManager, Formatting.Indented));
         sr.Close();
@@ -796,12 +838,12 @@ namespace DRaumServerApp
       }
     }
 
-    private String buildPostingText(Posting posting)
+    private String buildPostingText(long postingId)
     {
-      String dspacePost = "<b>Post Nr. " + posting.getPostID() + "</b>\r\n\r\n";
-      dspacePost += posting.getPostingText();
-      dspacePost += "\r\n\r\n" + this.authors.getAuthorPostText(posting.getAuthorID());
-      dspacePost += "\r\n" + posting.getPostStatisticText();
+      String dspacePost = "<b>Post Nr. " + postingId + "</b>\r\n\r\n";
+      dspacePost += this.posts.getPostingText(postingId);
+      dspacePost += "\r\n\r\n" + this.authors.getAuthorPostText( this.posts.getAuthorID(postingId) );
+      dspacePost += "\r\n" + this.posts.getPostingStatisticText(postingId);
       return dspacePost;
     }
 
@@ -910,7 +952,7 @@ namespace DRaumServerApp
           this.authors.setPostMode(e.Message.From.Id, e.Message.From.Username);
           await this.telegramInputBot.SendTextMessageAsync(
             chatId: e.Message.Chat,
-            text: DRaumManager.postIntro
+            text: postIntro
           );
           return;
         }
@@ -936,14 +978,14 @@ namespace DRaumServerApp
           this.authors.setFeedbackMode(e.Message.From.Id, e.Message.From.Username);
           await this.telegramInputBot.SendTextMessageAsync(
             chatId: e.Message.Chat,
-            text: DRaumManager.feedbackIntro
+            text: feedbackIntro
           );
           return;
         }
         /////// ===   Input-Processing    === ////////
         if (this.authors.isPostMode(e.Message.From.Id, e.Message.From.Username))
         {
-          /// == NEW POST SUBMITTED ==
+          // == NEW POST SUBMITTED ==
           if (!SpamFilter.checkPostInput(e.Message.Text, out string posttext, out string message))
           {
             // spamfilter hat zugeschlagen
@@ -960,7 +1002,7 @@ namespace DRaumServerApp
           this.posts.addPosting(posttext, e.Message.From.Id);
           await this.telegramInputBot.SendTextMessageAsync(
             chatId: e.Message.Chat,
-            text: DRaumManager.replyPost + "\r\nMeldung des Spamfilters: " + message
+            text: replyPost + "\r\nMeldung des Spamfilters: " + message
           );
           return;
         }           
@@ -983,14 +1025,14 @@ namespace DRaumServerApp
           this.feedbackManager.enqueueFeedback(new FeedbackElement( "Von: @" + e.Message.From.Username + " ID(" + e.Message.From.Id + ") : " + feedbacktext, e.Message.Chat.Id));        
           await this.telegramInputBot.SendTextMessageAsync(
             chatId: e.Message.Chat,
-            text: DRaumManager.replyFeedback
+            text: replyFeedback
           );
           return;
         }
         // Kein Modus
         await this.telegramInputBot.SendTextMessageAsync(
           chatId: e.Message.Chat,
-          text: DRaumManager.noModeChosen
+          text: noModeChosen
         );
       }
     }
@@ -1033,9 +1075,9 @@ namespace DRaumServerApp
     {
       if(e.CallbackQuery.Data != null)
       {
-        String callbackData = e.CallbackQuery.Data;
-        String callbackAction = callbackData.Substring(0, 1);
-        String postidstring = callbackData.Substring(1);
+        string callbackData = e.CallbackQuery.Data;
+        string callbackAction = callbackData.Substring(0, 1);
+        string postidstring = callbackData.Substring(1);
         long postingID = 0;
         if (postidstring.Trim().Length > 0)
         {
@@ -1044,7 +1086,7 @@ namespace DRaumServerApp
         if (callbackAction.Equals(genericMessageDeletePrefix))
         {
           await this.telegramModerateBot.DeleteMessageAsync(
-            chatId: adminChatId,
+            chatId: this.adminChatId,
             e.CallbackQuery.Message.MessageId);
         }
         if(callbackAction.Equals(modDeletePrefix))
@@ -1061,7 +1103,7 @@ namespace DRaumServerApp
             {
               // Nachricht aus dem D-Raum löschen
               await this.telegramPublishBot.DeleteMessageAsync(
-                chatId: draumChatId,
+                chatId: this.draumChatId,
                 messageId: messageID);
               // Nachricht aus dem Admin-Chat löschen
               await this.telegramAdminBot.DeleteMessageAsync(
@@ -1113,9 +1155,9 @@ namespace DRaumServerApp
     {
       if (e.CallbackQuery.Data != null)
       {
-        String callbackData = e.CallbackQuery.Data;
-        String callbackAction = callbackData.Substring(0, 1);
-        String postidstring = callbackData.Substring(1);
+        string callbackData = e.CallbackQuery.Data;
+        string callbackAction = callbackData.Substring(0, 1);
+        string postidstring = callbackData.Substring(1);
         long postingID = 0;
         if (postidstring.Trim().Length > 0)
         {
@@ -1126,7 +1168,7 @@ namespace DRaumServerApp
         // ==  Der Moderator akzeptiert den Beitrag
         if (callbackAction.Equals(modAcceptPrefix))
         {          
-          if(acceptPostForPublishing(postingID).Result)
+          if(this.acceptPostForPublishing(postingID).Result)
           {
             // Message not needed anymore, delete
             await this.telegramModerateBot.DeleteMessageAsync(
@@ -1179,17 +1221,16 @@ namespace DRaumServerApp
             messageId: e.CallbackQuery.Message.MessageId
           );
           this.feedbackManager.waitForDenyingText(postingID);
-          await this.telegramModerateBot.AnswerCallbackQueryAsync(
-            callbackQueryId: e.CallbackQuery.Id,
-            text: "Begründung schreiben und abschicken",
-            showAlert: true
+          await this.telegramModerateBot.SendTextMessageAsync(
+            chatId: this.moderateChatId,
+            text: "Begründung schreiben und abschicken"
           );
           return;
         }
         if(callbackAction.Equals(genericMessageDeletePrefix))
         {
           await this.telegramModerateBot.DeleteMessageAsync(
-            chatId: moderateChatId,
+            chatId: this.moderateChatId,
             e.CallbackQuery.Message.MessageId);
         }
         if(callbackAction.Equals(modGetNextCheckPostPrefix))
@@ -1225,7 +1266,7 @@ namespace DRaumServerApp
                 Posting posting = this.posts.removePostFromInCheck(postingPair.Key);
                 if(posting != null)
                 {
-                  await telegramInputBot.SendTextMessageAsync(
+                  await this.telegramInputBot.SendTextMessageAsync(
                     chatId: posting.getAuthorID(),
                     text: "Dieser Beitrag konnte aufgrund interner Fehler nicht bearbeitet werden:  " +
                       posting.getPostingText() +
@@ -1248,9 +1289,9 @@ namespace DRaumServerApp
       if (e.CallbackQuery.Data != null)
       {
         // Auswerten: Vote-up, Vote-down, Flag
-        String callbackData = e.CallbackQuery.Data;
-        String callbackAction = callbackData.Substring(0, 1);
-        String postidstring = callbackData.Substring(1);
+        string callbackData = e.CallbackQuery.Data;
+        string callbackAction = callbackData.Substring(0, 1);
+        string postidstring = callbackData.Substring(1);
         long postingID = 0;
         if (postidstring.Trim().Length > 0)
         {
@@ -1323,7 +1364,7 @@ namespace DRaumServerApp
             );
             return;
           }
-          String responseText = "Beitrag bereits markiert oder eigener Post";
+          string responseText = "Beitrag bereits markiert oder eigener Post";
           if (this.posts.canUserFlag(postingID, e.CallbackQuery.From.Id))
           {
             this.statistics.increaseInteraction();
@@ -1347,9 +1388,9 @@ namespace DRaumServerApp
     {
       if (e.CallbackQuery.Data != null)
       {
-        String callbackData = e.CallbackQuery.Data;
-        String callbackAction = callbackData.Substring(0, 1);
-        String postidstring = callbackData.Substring(1);
+        string callbackData = e.CallbackQuery.Data;
+        string callbackAction = callbackData.Substring(0, 1);
+        string postidstring = callbackData.Substring(1);
         long postingID = 0;
         if (postidstring.Trim().Length > 0)
         {
@@ -1357,7 +1398,7 @@ namespace DRaumServerApp
         }
         if (callbackAction.Equals(modAcceptPrefix))
         {
-          if(acceptPostForPublishing(postingID).Result)
+          if(this.acceptPostForPublishing(postingID).Result)
           {
             // Nachricht löschen
             await this.telegramInputBot.DeleteMessageAsync(
@@ -1412,9 +1453,9 @@ namespace DRaumServerApp
       {
         if (this.feedbackManager.isWaitingForFeedbackReply())
         {
-          long chatID = this.feedbackManager.processFeedbackReplyAndGetChatID();
+          long chatId = this.feedbackManager.processFeedbackReplyAndGetChatID();
           await this.telegramInputBot.SendTextMessageAsync(
-            chatId: chatID,
+            chatId: chatId,
             text: "Eine Antwort des Kanalbetreibers auf Ihr Feedback:\r\n\r\n" + e.Message.Text
           );
           await this.telegramFeedbackBot.SendTextMessageAsync(
@@ -1457,12 +1498,12 @@ namespace DRaumServerApp
             };
             InlineKeyboardMarkup keyboard2 = new InlineKeyboardMarkup(buttonlist2);
             await this.telegramModerateBot.SendTextMessageAsync(
-              chatId: moderateChatId,
+              chatId: this.moderateChatId,
               text: "Geänderter Text ist dem Autor zugestellt.",
               replyMarkup: keyboard2
             );
             await this.telegramModerateBot.DeleteMessageAsync(
-              chatId: moderateChatId,
+              chatId: this.moderateChatId,
               messageId: e.Message.MessageId);
           }
           else
@@ -1475,7 +1516,7 @@ namespace DRaumServerApp
             InlineKeyboardMarkup keyboard2 = new InlineKeyboardMarkup(buttonlist2);
             logger.Error("Konnte den zu editierenden Post nicht laden: " + this.feedbackManager.getNextModeratedPostID());
             await this.telegramModerateBot.SendTextMessageAsync(
-              chatId: moderateChatId,
+              chatId: this.moderateChatId,
               text: "Der zu editierende Post wurde nicht gefunden. Nochmal den Text abschicken. Wenn der Fehler bestehen bleibt, einen Administrator informieren",
               replyMarkup: keyboard2
             );
