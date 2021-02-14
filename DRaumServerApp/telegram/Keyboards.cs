@@ -20,6 +20,16 @@ namespace DRaumServerApp.telegram
       return _getNextPostToModerateKeyboard;
     }
 
+    internal static InlineKeyboardMarkup getTopPostLinkKeyboard(long messageId, string roomname)
+    {
+      InlineKeyboardButton linkbutton = InlineKeyboardButton.WithUrl("Lesen und Abstimmen", "https://t.me/" + roomname + "/" + messageId);
+      List<InlineKeyboardButton> buttonlist = new List<InlineKeyboardButton>
+      {
+        linkbutton
+      };
+      return new InlineKeyboardMarkup(buttonlist);
+    }
+
     internal static InlineKeyboardMarkup getPostKeyboard(int upvotePercentage, long postId)
     {
       int downvotePercentage = 100 - upvotePercentage;

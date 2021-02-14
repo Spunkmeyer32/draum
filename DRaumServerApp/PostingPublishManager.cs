@@ -8,9 +8,9 @@ namespace DRaumServerApp
   {
     private static NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
 
-    private static int firstHour = 0; // 9
-    private static int lastHour = 23; // 20
-    private static int minutesBetween = 1; // 20
+    private static int firstHour = 9; // 9
+    private static int lastHour = 20; // 20
+    private static int minutesBetween = 20; // 20
 
     private static int premiumHour = 17;
     private static int happyHour = premiumHour+1;

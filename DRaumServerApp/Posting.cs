@@ -44,10 +44,6 @@ namespace DRaumServerApp
     [JsonProperty]
     private volatile bool flagged;
     [JsonProperty]
-    private volatile bool postedInDaily;
-    [JsonProperty]
-    private volatile bool postedInWeekly;
-    [JsonProperty]
     private volatile int daysBeforeDelete;
     [JsonProperty]
     private volatile bool isTopPost;
@@ -104,8 +100,6 @@ namespace DRaumServerApp
       this.dirtyFlag = false;
       this.dirtyTextFlag = false;
       this.isTopPost = false;
-      this.postedInDaily = false;
-      this.postedInWeekly = false;
       this.daysBeforeDelete = DAYSUNTILDELETENORMAL;
     }
 
@@ -345,6 +339,11 @@ namespace DRaumServerApp
     internal int getChatMessageWeeklyID()
     {
       return this.chatMessageWeeklyId;
+    }
+
+    internal bool getTopPostStatus()
+    {
+      return this.isTopPost;
     }
   }
 }

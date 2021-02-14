@@ -57,21 +57,21 @@ namespace DRaumServerTest
         }
       } while (pair.Key != -1);
       Assert.AreEqual(numposts, count);
-      List<Posting> list = pmgr.getDailyTopPostsFromYesterday();
+      List<long> list = pmgr.getDailyTopPostsFromYesterday();
       bool found10 = false;
       bool found09 = false;
       bool found08 = false;
-      foreach (Posting posting in list)
+      foreach (long postingId in list)
       {
-        if (posting.getPostID() == 10)
+        if (postingId == 10)
         {
           found10 = true;
         }
-        if (posting.getPostID() == 9)
+        if (postingId == 9)
         {
           found09 = true;
         }
-        if (posting.getPostID() == 8)
+        if (postingId == 8)
         {
           found08 = true;
         }

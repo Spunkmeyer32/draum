@@ -10,8 +10,6 @@ namespace DRaumServerApp
 
     [JsonIgnore]
     private long currentIntervalInteractions;
-    [JsonProperty]
-    private long infoTopPostsOverall;
     [JsonIgnore]
     private long lastIntervalInteractions;
     [JsonProperty]
@@ -24,7 +22,6 @@ namespace DRaumServerApp
     internal DRaumStatistics() 
     {
       this.medianVotesPerPost = 0;
-      this.infoTopPostsOverall = 0;
       this.medianWritersLevel = 1;
       this.topWritersLevel = 1;
     }

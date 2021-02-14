@@ -404,6 +404,33 @@ namespace DRaumServerApp
       return -1;
     }
 
+    internal int getMessageIdDaily(long postID)
+    {
+      if (this.postings.ContainsKey(postID))
+      {
+        return this.postings[postID].getChatMessageDailyID();
+      }
+      return -1;
+    }
+
+    internal int getMessageIdWeekly(long postID)
+    {
+      if (this.postings.ContainsKey(postID))
+      {
+        return this.postings[postID].getChatMessageWeeklyID();
+      }
+      return -1;
+    }
+
+    internal bool isTopPost(long postID)
+    {
+      if (this.postings.ContainsKey(postID))
+      {
+        return this.postings[postID].getTopPostStatus();
+      }
+      return false;
+    }
+
     internal int getUpVotePercentage(long postID)
     {
       if (this.postings.ContainsKey(postID))
@@ -431,7 +458,22 @@ namespace DRaumServerApp
       return "";
     }
 
- 
+    internal void setDailyChatMsgId(long postid, int messageId)
+    {
+      if (this.postings.ContainsKey(postid))
+      {
+        this.postings[postid].setChatMessageDailyID(messageId);
+      }
+    }
+
+    internal void setWeeklyChatMsgId(long postid, int messageId)
+    {
+      if (this.postings.ContainsKey(postid))
+      {
+        this.postings[postid].setChatMessageWeeklyID(messageId);
+      }
+    }
+
 
     internal bool removePost(long postingID)
     {
@@ -453,7 +495,22 @@ namespace DRaumServerApp
       return false;
     }
 
-    internal List<Posting> getDailyTopPostsFromYesterday()
+    internal void updateTopPostStatus(DRaumStatistics statistics)
+    {
+      foreach (Posting posting in this.postings.Values)
+      {
+        if (statistics.isTopPost(posting.getUpVotePercentage(), posting.getVoteCount()))
+        {
+          posting.setTopPostStatus(true);
+        }
+        else
+        {
+          posting.setTopPostStatus(false);
+        }
+      }
+    }
+
+    internal List<long> getDailyTopPostsFromYesterday()
     {
       // Iteriere über alle Posts, filtern nach Gestern, Sortieren nach Votes, Top 3 zurück
       DateTime yesterday = new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day, 0, 0, 0);
@@ -474,20 +531,69 @@ namespace DRaumServerApp
       {
         Array targetlist = result.ToArray();
         Array.Sort(targetlist, new PostingVoteComparer());
-        List<Posting> resultList = new List<Posting>
+        List<long> resultList = new List<long>
         {
-          (Posting)targetlist.GetValue(0),
-          (Posting)targetlist.GetValue(1),
-          (Posting)targetlist.GetValue(2)
+          ((Posting)targetlist.GetValue(0)).getPostID(),
+          ((Posting)targetlist.GetValue(1)).getPostID(),
+          ((Posting)targetlist.GetValue(2)).getPostID()
         };
         return resultList;
       }
       else
       {
-        return new List<Posting>( result.ToArray() );
+        List<long> resultList = new List<long>();
+        foreach (Posting posting in result)
+        {
+          resultList.Add(posting.getPostID());
+        }
+        return resultList;
       }
-      
     }
+
+
+    internal List<long> getWeeklyTopPostsFromLastWeek()
+    {
+      // Iteriere über alle Posts, filtern nach Gestern, Sortieren nach Votes, Top 3 zurück
+      DateTime lastWeek = new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day, 0, 0, 0);
+      lastWeek = lastWeek.AddDays(-7.0);
+      List<Posting> result = new List<Posting>();
+      foreach (Posting posting in this.postings.Values)
+      {
+        TimeSpan diff = posting.getPublishTimestamp() - lastWeek;
+        if (diff.TotalDays >= 0.0 && diff.TotalDays <= 7.0)
+        {
+          if (posting.getUpVotePercentage() > 50)
+          {
+            result.Add(posting);
+          }
+        }
+      }
+      if (result.Count > 5)
+      {
+        Array targetlist = result.ToArray();
+        Array.Sort(targetlist, new PostingVoteComparer());
+        List<long> resultList = new List<long>
+        {
+          ((Posting)targetlist.GetValue(0)).getPostID(),
+          ((Posting)targetlist.GetValue(1)).getPostID(),
+          ((Posting)targetlist.GetValue(2)).getPostID(),
+          ((Posting)targetlist.GetValue(3)).getPostID(),
+          ((Posting)targetlist.GetValue(4)).getPostID()
+        };
+        return resultList;
+      }
+      else
+      {
+        List<long> resultList = new List<long>();
+        foreach (Posting posting in result)
+        {
+          resultList.Add(posting.getPostID());
+        }
+        return resultList;
+      }
+    }
+
+
   }
 
 

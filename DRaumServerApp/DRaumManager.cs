@@ -111,6 +111,8 @@ namespace DRaumServerApp
     private static readonly String backupFolder = "backups";
     private static readonly String filePrefix = "_draum_";
 
+    private static readonly string roomname = "d_raum";
+
     private static readonly String writecommand = "schreiben";
     private static readonly String feedbackcommand = "nachricht";
 
@@ -134,8 +136,8 @@ namespace DRaumServerApp
 
     // Tasks und Intervalle für das regelmäßige Abarbeiten von Aufgaben
     private static readonly int intervalCheckPublishSeconds = 15;
-    private static readonly int intervalBackUpDataMinutes = 45;
-    private static readonly int intervalVoteAndFlagCountMinutes = 2; // 15
+    private static readonly int intervalBackUpDataMinutes = 60;
+    private static readonly int intervalVoteAndFlagCountMinutes = 5;
     private static readonly int intervalpostcheckMilliseconds = 250;
     private static readonly int intervalStatisticCollectionMinutes = 60;
 
@@ -544,6 +546,9 @@ namespace DRaumServerApp
           logger.Error(ex, "Beim senden eines geflaggten Beitrags trat ein Fehler auf.");
         }
       }
+      // Update the Status of top-posts
+      this.posts.updateTopPostStatus(this.statistics);
+
     }
     
     private async Task backUpTask()
@@ -561,7 +566,7 @@ namespace DRaumServerApp
         {
           logger.Error("Die Tasks sind nicht alle angehalten!");
         }
-        this.backupData();
+        await this.backupData();
         this.telegramInputBot.StartReceiving(receivefilterCallbackAndMessage);
         this.telegramModerateBot.StartReceiving(receivefilterCallbackAndMessage);
         this.telegramPublishBot.StartReceiving(receivefilterCallbackOnly);
@@ -579,46 +584,72 @@ namespace DRaumServerApp
 
     private async void publishingTask()
     {
+      bool skip = false;
       // News-Post
       if( (DateTime.Now - this.lastWorldNewsPost).TotalHours > 24.0 )
       {
+        if (this.lastWorldNewsPost.Year <= 2000)
+        {
+          skip = true;
+        }
         this.lastWorldNewsPost = new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day, 9, 0, 0);
         logger.Info("Nächste News am " + this.lastWorldNewsPost.AddHours(24).ToString(Utilities.usedCultureInfo));
-        String news = this.worldInfoManager.getInfoStringForChat();
-        try
+        if (!skip)
         {
-          await this.telegramPublishBot.SendTextMessageAsync(
-            chatId: this.draumChatId,
-            text: news);
-        }
-        catch(Exception e)
-        {
-          logger.Error(e, "Fehler beim Posten der News");
+          String news = this.worldInfoManager.getInfoStringForChat();
+          try
+          {
+            await this.telegramPublishBot.SendTextMessageAsync(
+              chatId: this.draumChatId,
+              text: news);
+          }
+          catch (Exception e)
+          {
+            logger.Error(e, "Fehler beim Posten der News");
+          }
         }
       }
+
+      skip = false;
       // Top-Daily
       if ((DateTime.Now - this.lastTopDaily).TotalHours > 24.0)
       {
+        if (this.lastTopDaily.Year <= 2000)
+        {
+          skip = true;
+        }
         this.lastTopDaily = new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day, 9, 0, 0);
         logger.Info("Nächste Top Tages Posts am " + this.lastTopDaily.AddHours(24).ToString(Utilities.usedCultureInfo));
-
-        List<Posting> topPosts = this.posts.getDailyTopPostsFromYesterday();
-
-
-
-        // https://t.me/d_raum/56 
-        /// TODO Top Daily
-        /// 
-        //await this.telegramPublishBot.ForwardMessageAsync(chatId: draumDailyChatId, fromChatId: draumChatId, 3);
-
-
-
-        /// TODO Alte Sachen löschen
-
+        if (!skip)
+        {
+          List<long> topPosts = this.posts.getDailyTopPostsFromYesterday();
+          foreach (long postId in topPosts)
+          {
+            logger.Debug("Es soll folgender Post in Top-Daily veröffentlicht werden: " + postId);
+            Message result = this.telegramPublishBot.SendTextMessageAsync(
+              chatId: this.draumDailyChatId,
+              parseMode: Telegram.Bot.Types.Enums.ParseMode.Html,
+              text: this.buildPostingTextForTopTeaser(postId),
+              replyMarkup: Keyboards.getTopPostLinkKeyboard(this.posts.getMessageID(postId), DRaumManager.roomname)
+            ).Result;
+            if (result == null || result.MessageId == 0)
+            {
+              logger.Error("Fehler beim Publizieren des Posts (daily,keine msg ID) bei Post " + postId);
+            }
+            else
+            {
+              this.posts.setDailyChatMsgId(postId, result.MessageId);
+            }
+            await Task.Delay(3000);
+          }
+        }
       }
+
+      skip = false;
       // Top-Weekly
       if ((DateTime.Now - this.lastTopWeekly).TotalDays > 7.0)
       {
+
         DayOfWeek currentDay = DateTime.Now.DayOfWeek;
         int daysTillCurrentDay = currentDay - DayOfWeek.Saturday;
         if(daysTillCurrentDay < 0)
@@ -626,14 +657,36 @@ namespace DRaumServerApp
           daysTillCurrentDay += 7;
         }
         DateTime currentWeekStartDate = DateTime.Now.AddDays(-daysTillCurrentDay);
+        if (this.lastTopWeekly.Year <= 2000)
+        {
+          skip = true;
+        }
         this.lastTopWeekly = new DateTime(currentWeekStartDate.Year, currentWeekStartDate.Month, currentWeekStartDate.Day, 9, 0, 0);
         logger.Info("Nächste Top Wochen Posts am " + this.lastTopWeekly.AddDays(7).ToString(Utilities.usedCultureInfo));
+        if (!skip)
+        {
+          List<long> topPosts = this.posts.getWeeklyTopPostsFromLastWeek();
+          foreach (long postId in topPosts)
+          {
+            logger.Debug("Es soll folgender Post in Top-Weekly veröffentlicht werden: " + postId);
+            Message result = this.telegramPublishBot.SendTextMessageAsync(
+              chatId: this.draumWeeklyChatId,
+              parseMode: Telegram.Bot.Types.Enums.ParseMode.Html,
+              text: this.buildPostingTextForTopTeaser(postId),
+              replyMarkup: Keyboards.getTopPostLinkKeyboard(this.posts.getMessageID(postId), DRaumManager.roomname)
+            ).Result;
+            if (result == null || result.MessageId == 0)
+            {
+              logger.Error("Fehler beim Publizieren des Posts (weekly,keine msg ID) bei Post " + postId);
+            }
+            else
+            {
+              this.posts.setWeeklyChatMsgId(postId, result.MessageId);
+            }
 
-
-        /// TODO Top Weekly
-
-
-
+            await Task.Delay(3000);
+          }
+        }
       }
 
 
@@ -707,7 +760,7 @@ namespace DRaumServerApp
       this.telegramPublishBot.StopReceiving();
       this.telegramFeedbackBot.StopReceiving();
       this.telegramAdminBot.SendTextMessageAsync(chatId: this.adminChatId, text: "Server ist beendet!").Wait();
-      this.backupData();
+      await this.backupData();
     }
 
     private String getDateFileString()
@@ -777,6 +830,11 @@ namespace DRaumServerApp
         jsonstring = sr.ReadToEnd();
         sr.Close();
         this.feedbackManager = JsonConvert.DeserializeObject<FeedbackManager>(jsonstring);
+        if (this.authors == null || this.posts == null || this.statistics == null || this.feedbackManager == null)
+        {
+          logger.Error("Beim Deserialisieren wurde eine Klasse als NULL deserialisiert!");
+          return false;
+        }
         return true;
       }
       catch(Exception e)
@@ -793,7 +851,7 @@ namespace DRaumServerApp
       return false;
     }
 
-    internal void backupData()
+    internal async Task backupData()
     {
       FileStream backupfile = null;
       try
@@ -803,26 +861,26 @@ namespace DRaumServerApp
         {
           di.Create();
         }
-        String datestring = this.getDateFileString();
+        string datestring = this.getDateFileString();
         logger.Info("Schreibe Post-Daten ins Dateisystem");
         backupfile = System.IO.File.Create(backupFolder + Path.DirectorySeparatorChar + datestring + filePrefix + "posts.json");
         StreamWriter sr = new StreamWriter(backupfile);
-        sr.Write(JsonConvert.SerializeObject(this.posts,Formatting.Indented));
+        await sr.WriteAsync(JsonConvert.SerializeObject(this.posts,Formatting.Indented));
         sr.Close();
         logger.Info("Schreibe Autoren-Daten ins Dateisystem");
         backupfile = System.IO.File.Create(backupFolder + Path.DirectorySeparatorChar + datestring + filePrefix + "authors.json");
         sr = new StreamWriter(backupfile);
-        sr.Write(JsonConvert.SerializeObject(this.authors, Formatting.Indented));
+        await sr.WriteAsync(JsonConvert.SerializeObject(this.authors, Formatting.Indented));
         sr.Close();
         logger.Info("Schreibe Statistik-Daten ins Dateisystem");
         backupfile = System.IO.File.Create(backupFolder + Path.DirectorySeparatorChar + datestring + filePrefix + "statistic.json");
         sr = new StreamWriter(backupfile);
-        sr.Write(JsonConvert.SerializeObject(this.statistics, Formatting.Indented));
+        await sr.WriteAsync(JsonConvert.SerializeObject(this.statistics, Formatting.Indented));
         sr.Close();
         logger.Info("Schreibe Feedback-Daten ins Dateisystem");
         backupfile = System.IO.File.Create(backupFolder + Path.DirectorySeparatorChar + datestring + filePrefix + "feedback.json");
         sr = new StreamWriter(backupfile);
-        sr.Write(JsonConvert.SerializeObject(this.feedbackManager, Formatting.Indented));
+        await sr.WriteAsync(JsonConvert.SerializeObject(this.feedbackManager, Formatting.Indented));
         sr.Close();
       }
       catch(Exception e)
@@ -840,11 +898,36 @@ namespace DRaumServerApp
 
     private String buildPostingText(long postingId)
     {
-      String dspacePost = "<b>Post Nr. " + postingId + "</b>\r\n\r\n";
-      dspacePost += this.posts.getPostingText(postingId);
-      dspacePost += "\r\n\r\n" + this.authors.getAuthorPostText( this.posts.getAuthorID(postingId) );
-      dspacePost += "\r\n" + this.posts.getPostingStatisticText(postingId);
-      return dspacePost;
+      string dspacepost = null;
+      if (this.posts.isTopPost(postingId))
+      {
+        dspacepost += "<b>🔈 TOP-POST Nr. " + postingId + " 🔈</b>\r\n\r\n";
+      }
+      else
+      {
+        dspacepost += "<b>Post Nr. " + postingId + "</b>\r\n\r\n";
+      }
+      dspacepost += this.posts.getPostingText(postingId);
+      dspacepost += "\r\n\r\n" + this.authors.getAuthorPostText(this.posts.getAuthorID(postingId));
+      dspacepost += "\r\n" + this.posts.getPostingStatisticText(postingId);
+      return dspacepost;
+    }
+
+    private String buildPostingTextForTopTeaser(long postingId)
+    {
+      string dspacepost = null;
+      if (this.posts.isTopPost(postingId))
+      {
+        dspacepost += "<b>🔈 TOP-POST Nr. " + postingId + " 🔈</b>\r\n\r\n";
+      }
+      else
+      {
+        dspacepost += "<b>Post Nr. " + postingId + "</b>\r\n\r\n";
+      }
+      dspacepost += this.posts.getPostingText(postingId).Substring(0,60)+" [...]";
+      dspacepost += "\r\n\r\n" + this.authors.getAuthorPostText(this.posts.getAuthorID(postingId));
+      dspacepost += "\r\n" + this.posts.getPostingStatisticText(postingId);
+      return dspacepost;
     }
 
     async Task<bool> acceptPostForPublishing(long postingID)
@@ -1093,6 +1176,8 @@ namespace DRaumServerApp
         {
           // Der Admin entscheided den geflaggten Post zu entfernen
           int messageID = this.posts.getMessageID(postingID);
+          int messageIdDaily = this.posts.getMessageIdDaily(postingID);
+          int messageIdWeekly = this.posts.getMessageIdWeekly(postingID);
           if (messageID != -1)
           {
             if (!this.posts.removePost(postingID))
@@ -1105,6 +1190,18 @@ namespace DRaumServerApp
               await this.telegramPublishBot.DeleteMessageAsync(
                 chatId: this.draumChatId,
                 messageId: messageID);
+              if (messageIdDaily != -1)
+              {
+                await this.telegramPublishBot.DeleteMessageAsync(
+                  chatId: this.draumDailyChatId,
+                  messageId: messageIdDaily);
+              }
+              if (messageIdWeekly != -1)
+              {
+                await this.telegramPublishBot.DeleteMessageAsync(
+                  chatId: this.draumWeeklyChatId,
+                  messageId: messageIdWeekly);
+              }
               // Nachricht aus dem Admin-Chat löschen
               await this.telegramAdminBot.DeleteMessageAsync(
                 chatId: this.adminChatId,
