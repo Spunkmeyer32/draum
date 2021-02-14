@@ -77,7 +77,7 @@ namespace DRaumServerApp
     /// </summary>
     internal static void unhalt()
     {
-      logger.Info(_runningTasks + " Tasks werden fortgeführt");
+      logger.Info("Tasks werden fortgeführt");
       _shouldWait = false;
       _externalEvent = null;
       resetEvent.Set();

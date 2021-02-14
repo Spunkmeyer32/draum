@@ -30,6 +30,18 @@ namespace DRaumServerApp.telegram
       return new InlineKeyboardMarkup(buttonlist);
     }
 
+    internal static InlineKeyboardMarkup getFlaggedPostModKeyboard(long postId)
+    {
+      InlineKeyboardButton deleteButton = InlineKeyboardButton.WithCallbackData("Beitrag löschen", DRaumManager.modDeletePrefix + postId);
+      InlineKeyboardButton clearFlagButton = InlineKeyboardButton.WithCallbackData("Flag entfernen", DRaumManager.modClearFlagPrefix + postId);
+      List<InlineKeyboardButton> buttonlist = new List<InlineKeyboardButton>
+      {
+        deleteButton,
+        clearFlagButton
+      };
+      return new InlineKeyboardMarkup(buttonlist);
+    }
+
     internal static InlineKeyboardMarkup getPostKeyboard(int upvotePercentage, long postId)
     {
       int downvotePercentage = 100 - upvotePercentage;

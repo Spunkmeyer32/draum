@@ -12,9 +12,9 @@ namespace DRaumServerApp
     private static bool nextLevelCalculated = false;
     private static long[] nextLevelExp;
 
-    public static bool RUNNINGINTESTMODE = true;
+    public static bool RUNNINGINTESTMODE = false;
 
-    public static CultureInfo usedCultureInfo = new CultureInfo("de-DE", false);
+    public static CultureInfo usedCultureInfo = CultureInfo.CreateSpecificCulture("de-DE");
 
     internal static long getNextLevelExp(int actualLevel)
     {

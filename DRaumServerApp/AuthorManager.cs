@@ -165,9 +165,9 @@ namespace DRaumServerApp
       Author author = this.getAuthor(authorID);
       if(author == null)
       {
-        return "<i>Schreiber/in nicht gefunden!</i>";
+        return "<i>Schreiber/in nicht gefunden!</i>\r\n<i>Verfasst im D-Raum https://t.me/d_raum </i>";
       }
-      return "<i>" + author.getUserInfo() + "</i>";
+      return "<i>" + author.getUserInfo() + "</i>\r\n<i>Verfasst im D-Raum https://t.me/d_raum </i>";
     }
 
     internal void updateCredibility(long authorID, long receivedUpVotes, long receivedDownVotes)

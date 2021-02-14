@@ -10,10 +10,10 @@ using System.Threading.Tasks;
 using System.Threading;
 using Telegram.Bot.Types;
 using System.Collections;
-using System.Diagnostics.Contracts;
+using System.Text;
 using DRaumServerApp.telegram;
+using Telegram.Bot.Exceptions;
 using Telegram.Bot.Types.Enums;
-
 
 /*
 
@@ -120,8 +120,8 @@ namespace DRaumServerApp
     private static readonly String modEditPrefix = "M";
     internal static readonly String modBlockPrefix = "N";
     internal static readonly String modGetNextCheckPostPrefix = "G";
-    private static readonly String modDeletePrefix = "R";
-    private static readonly String modClearFlagPrefix = "C";
+    internal static readonly String modDeletePrefix = "R";
+    internal static readonly String modClearFlagPrefix = "C";
 
     private static readonly String genericMessageDeletePrefix = "X";
 
@@ -292,9 +292,7 @@ namespace DRaumServerApp
         {
           break;
         }
-       
         this.voteFlagTask();
-        
       }
       logger.Info("Voting-Flagging-Task ist beendet");
     }
@@ -316,7 +314,6 @@ namespace DRaumServerApp
         {
           break;
         }
-
         this.statisticCollectionTask();
       }
       logger.Info("Statistik-Task ist beendet");
@@ -339,7 +336,6 @@ namespace DRaumServerApp
         {
           break;
         }
-
         this.inputCheckTask();
       }
       logger.Info("Input-Check-Task ist beendet");
@@ -362,7 +358,6 @@ namespace DRaumServerApp
         {
           break;
         }
-
         this.publishingTask();
       }
       logger.Info("Publish-Task ist beendet");
@@ -392,7 +387,7 @@ namespace DRaumServerApp
 
     private async void checkAndUpdateAdminStatistic()
     {
-      String newtext = "Interaktionen im letzten Intervall: " + this.statistics.getLastInteractionIntervalCount();
+      String newtext = "Interaktionen im letzten Intervall: " + this.statistics.getLastInteractionIntervalCount()+"\r\n";
       newtext += "Letztes Backup: " + this.lastBackup.ToString(Utilities.usedCultureInfo);
       if (!newtext.Equals(this.adminStatisticText))
       {
@@ -400,28 +395,47 @@ namespace DRaumServerApp
         int msgId = this.feedbackManager.getAdminStatisticMessageID();
         if (msgId == -1)
         {
-          Message msg = this.telegramAdminBot.SendTextMessageAsync(
-            chatId: this.adminChatId,
-            text: this.adminStatisticText).Result;
-          this.feedbackManager.setAdminStatisticMessageID(msg.MessageId);
+          try
+          {
+            Message msg = this.telegramAdminBot.SendTextMessageAsync(
+              chatId: this.adminChatId,
+              text: this.adminStatisticText).Result;
+            this.feedbackManager.setAdminStatisticMessageID(msg.MessageId);
+          }
+          catch (Exception ex)
+          {
+            this.feedbackManager.setAdminStatisticMessageID(-1);
+            logger.Error(ex,"Fehler beim Senden der Statistiknachricht an den Admin");
+          }
         }
         else
         {
-          await this.telegramAdminBot.EditMessageTextAsync(
-            chatId: this.adminChatId,
-            messageId: msgId,
-            text: this.adminStatisticText);
+          try
+          {
+            await this.telegramAdminBot.EditMessageTextAsync(
+              chatId: this.adminChatId,
+              messageId: msgId,
+              text: this.adminStatisticText);
+          }
+          catch (Exception ex)
+          {
+            logger.Error(ex, "Fehler beim Ändern der Statistik-Nachricht an den Admin");
+          }
         }
       }
     }
 
     private void statisticCollectionTask()
     {
-      // Run statistic updates
       try
       {
         this.statistics.switchInteractionInterval();
         checkAndUpdateAdminStatistic();
+        this.authors.getMedianAndTopLevel(out var median, out var top);
+        this.statistics.updateWritersLevel(top,median);
+        long medianVotes = this.posts.getMedianVotes();
+        this.statistics.setVotesMedian(medianVotes);
+        logger.Info("Statisktik ist nun aktualisiert");
       }
       catch(Exception e)
       {
@@ -470,7 +484,6 @@ namespace DRaumServerApp
           }
         }
       }
-      
     }
 
     private async void voteFlagTask()
@@ -479,7 +492,7 @@ namespace DRaumServerApp
       IEnumerable<long> dirtyposts = this.posts.getDirtyPosts();
       foreach (long postID in dirtyposts)
       {
-        logger.Debug("Buttons eines Posts werden aktualisiert");
+        logger.Debug("Buttons eines Posts (" + postID + ") werden aktualisiert");
         try
         {
           Message msg = this.telegramPublishBot.EditMessageReplyMarkupAsync(
@@ -489,9 +502,18 @@ namespace DRaumServerApp
           this.posts.resetDirtyFlag(postID);
           await Task.Delay(3000);
         }
+        catch (MessageIsNotModifiedException)
+        {
+          this.posts.resetDirtyFlag(postID);
+          logger.Warn("Die Buttons des Posts " + postID + " waren nicht verändert");
+        }
+        catch (ApiRequestException are)
+        {
+          logger.Error(are, "PostID= "+postID+" (buttonupdate) Message=" + are.Message);
+        }
         catch (Exception ex)
         {
-          logger.Error(ex, "Beim aktualisieren eines Buttons eines Beitrags trat ein Fehler auf.");
+          logger.Error(ex, "Beim aktualisieren eines Buttons eines Beitrags ("+postID+") trat ein Fehler auf.");
         }
       }
 
@@ -499,7 +521,7 @@ namespace DRaumServerApp
       dirtyposts = this.posts.getTextDirtyPosts();
       foreach (long postID in dirtyposts)
       {
-        logger.Debug("Text eines Posts wird aktualisiert");
+        logger.Debug("Text eines Posts ("+postID+") wird aktualisiert");
         try
         {
           Message msg = this.telegramPublishBot.EditMessageTextAsync(
@@ -511,9 +533,18 @@ namespace DRaumServerApp
           this.posts.resetTextDirtyFlag(postID);
           await Task.Delay(3000);
         }
+        catch (MessageIsNotModifiedException)
+        {
+          this.posts.resetTextDirtyFlag(postID);
+          logger.Warn("Der Text des Posts " + postID + " ist nicht verändert");
+        }
+        catch (ApiRequestException are)
+        {
+          logger.Error(are, "PostID= "+postID+" (textupdate) Message=" + are.Message);
+        }
         catch (Exception ex)
         {
-          logger.Error(ex, "Beim aktualisieren eines Textes eines Beitrags trat ein Fehler auf.");
+          logger.Error(ex, "Beim aktualisieren eines Textes eines Beitrags (" + postID + ") trat ein Fehler auf.");
         }
       }
 
@@ -524,22 +555,13 @@ namespace DRaumServerApp
       foreach (long postID in flaggedPosts)
       {
         // getText and send to Admin
-        String msgText = "Dieser Post wurde geflaggt!!! \r\n" + this.posts.getPostingText(postID);
-        // Tastatur für Admin: Flag verwerfen, Beitrag löschen
-        InlineKeyboardButton deleteButton = InlineKeyboardButton.WithCallbackData("Beitrag löschen", modDeletePrefix + postID);
-        InlineKeyboardButton clearFlagButton = InlineKeyboardButton.WithCallbackData("Flag entfernen", modClearFlagPrefix + postID);
-        List<InlineKeyboardButton> buttonlist = new List<InlineKeyboardButton>
-        {
-          deleteButton,
-          clearFlagButton
-        };
-        InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup(buttonlist);
+        String msgText = "Dieser Post wurde "+this.posts.getFlagCountOfPost(postID) +"-Mal geflaggt!!! \r\n" + this.posts.getPostingText(postID);
         try
         {
           Message msg = this.telegramAdminBot.SendTextMessageAsync(
             chatId: this.adminChatId,
             text: msgText,
-            replyMarkup: keyboard).Result;
+            replyMarkup: Keyboards.getFlaggedPostModKeyboard(postID)).Result;
         }
         catch (Exception ex)
         {
@@ -548,7 +570,6 @@ namespace DRaumServerApp
       }
       // Update the Status of top-posts
       this.posts.updateTopPostStatus(this.statistics);
-
     }
     
     private async Task backUpTask()
@@ -649,7 +670,6 @@ namespace DRaumServerApp
       // Top-Weekly
       if ((DateTime.Now - this.lastTopWeekly).TotalDays > 7.0)
       {
-
         DayOfWeek currentDay = DateTime.Now.DayOfWeek;
         int daysTillCurrentDay = currentDay - DayOfWeek.Saturday;
         if(daysTillCurrentDay < 0)
@@ -688,8 +708,6 @@ namespace DRaumServerApp
           }
         }
       }
-
-
 
       long postID = -1;
       bool fail = false;
@@ -898,37 +916,52 @@ namespace DRaumServerApp
 
     private String buildPostingText(long postingId)
     {
-      string dspacepost = null;
+      StringBuilder sb = new StringBuilder();
       if (this.posts.isTopPost(postingId))
       {
-        dspacepost += "<b>🔈 TOP-POST Nr. " + postingId + " 🔈</b>\r\n\r\n";
+        sb.Append("<b>🔈 == TOP-POST Nr. ");
+        sb.Append(postingId);
+        sb.Append(" == 🔈</b>\r\n\r\n");
       }
       else
       {
-        dspacepost += "<b>Post Nr. " + postingId + "</b>\r\n\r\n";
+        sb.Append("<b>Post Nr. ");
+        sb.Append(postingId);
+        sb.Append("</b>\r\n\r\n");
       }
-      dspacepost += this.posts.getPostingText(postingId);
-      dspacepost += "\r\n\r\n" + this.authors.getAuthorPostText(this.posts.getAuthorID(postingId));
-      dspacepost += "\r\n" + this.posts.getPostingStatisticText(postingId);
-      return dspacepost;
+      sb.Append(this.posts.getPostingText(postingId));
+      sb.Append("\r\n\r\n");
+      sb.Append(this.authors.getAuthorPostText(this.posts.getAuthorID(postingId)));
+      sb.Append("\r\n");
+      sb.Append(this.posts.getPostingStatisticText(postingId));
+      return sb.ToString();
     }
 
     private String buildPostingTextForTopTeaser(long postingId)
     {
-      string dspacepost = null;
+      StringBuilder sb = new StringBuilder();
       if (this.posts.isTopPost(postingId))
       {
-        dspacepost += "<b>🔈 TOP-POST Nr. " + postingId + " 🔈</b>\r\n\r\n";
+        sb.Append("<b>🔈 == TOP-POST Nr. ");
+        sb.Append(postingId);
+        sb.Append(" == 🔈</b>\r\n\r\n");
       }
       else
       {
-        dspacepost += "<b>Post Nr. " + postingId + "</b>\r\n\r\n";
+        sb.Append("<b>Post Nr. ");
+        sb.Append(postingId);
+        sb.Append("</b>\r\n\r\n");
       }
-      dspacepost += this.posts.getPostingText(postingId).Substring(0,60)+" [...]";
-      dspacepost += "\r\n\r\n" + this.authors.getAuthorPostText(this.posts.getAuthorID(postingId));
-      dspacepost += "\r\n" + this.posts.getPostingStatisticText(postingId);
-      return dspacepost;
+      sb.Append(this.posts.getPostingText(postingId).Substring(0, 60));
+      sb.Append(" [...]");
+      sb.Append("\r\n\r\n");
+      sb.Append(this.authors.getAuthorPostText(this.posts.getAuthorID(postingId)));
+      sb.Append("\r\n");
+      sb.Append(this.posts.getPostingStatisticText(postingId));
+      return sb.ToString();
     }
+
+    // ==== TODO Cleanup weitermachen
 
     async Task<bool> acceptPostForPublishing(long postingID)
     {
@@ -1383,98 +1416,119 @@ namespace DRaumServerApp
 
     async void onPublishCallback(object sender, CallbackQueryEventArgs e)
     {
-      if (e.CallbackQuery.Data != null)
+      try
       {
-        // Auswerten: Vote-up, Vote-down, Flag
-        string callbackData = e.CallbackQuery.Data;
-        string callbackAction = callbackData.Substring(0, 1);
-        string postidstring = callbackData.Substring(1);
-        long postingID = 0;
-        if (postidstring.Trim().Length > 0)
+        if (e.CallbackQuery.Data != null)
         {
-          postingID = long.Parse(postidstring);
-        }
-        if (callbackAction.Equals(voteUpPrefix))
-        {
-          // UPVOTE
-          String responseText = "Stimme bereits abgegeben oder eigener Post";
-          if (this.posts.canUserVote(postingID, e.CallbackQuery.From.Id))
-          {            
-            int votecount = this.authors.voteUpAndGetCount(e.CallbackQuery.From.Id, e.CallbackQuery.From.Username);
-            if(votecount != 0)
-            {
-              this.statistics.increaseInteraction();
-              this.authors.updateCredibility(this.posts.getAuthorID(postingID), votecount, 0);
-              this.posts.upvote(postingID, e.CallbackQuery.From.Id, votecount);
-              responseText = "Positivstimme erhalten";
-            }
-            else
-            {
-              responseText = "Fehler beim Abstimmen!";
-            }            
-          }
-          await this.telegramPublishBot.AnswerCallbackQueryAsync(
-             callbackQueryId: e.CallbackQuery.Id,
-             text: responseText,
-             showAlert: true
-          );
-        }
-        if(callbackAction.Equals(voteDownPrefix))
-        {
-          // DOWNVOTE
-          String responseText = "Stimme bereits abgegeben oder eigener Post";
-          if (this.posts.canUserVote(postingID, e.CallbackQuery.From.Id))
+          // Auswerten: Vote-up, Vote-down, Flag
+          string callbackData = e.CallbackQuery.Data;
+          string callbackAction = callbackData.Substring(0, 1);
+          string postidstring = callbackData.Substring(1);
+          long postingID = 0;
+          if (postidstring.Trim().Length > 0)
           {
-            int votecount = this.authors.voteDownAndGetCount(e.CallbackQuery.From.Id, e.CallbackQuery.From.Username);
-            if (votecount != 0)
-            {
-              this.statistics.increaseInteraction();
-              this.authors.updateCredibility(this.posts.getAuthorID(postingID), 0, votecount);
-              this.posts.downvote(postingID, e.CallbackQuery.From.Id, votecount);
-              responseText = "Negativstimme erhalten";
-            }
-            else
-            {
-              responseText = "Fehler beim Abstimmen!";
-            }
+            postingID = long.Parse(postidstring);
           }
-          await this.telegramPublishBot.AnswerCallbackQueryAsync(
-             callbackQueryId: e.CallbackQuery.Id,
-             text: responseText,             
-             showAlert: true
-          );
-        }
-        if(callbackAction.Equals(flagPrefix))
-        {
-          // Flagging
-          if (!this.authors.isCoolDownOver(e.CallbackQuery.From.Id, e.CallbackQuery.From.Username, Author.InteractionCooldownTimer.FLAGGING))
+
+          if (callbackAction.Equals(voteUpPrefix))
           {
-            TimeSpan coolDownTime = this.authors.getCoolDownTimer(e.CallbackQuery.From.Id, e.CallbackQuery.From.Username, Author.InteractionCooldownTimer.FLAGGING);
-            String msgCoolDownText = "(Spamvermeidung) Zeit bis zur nächsten Markiermöglichkeit: " + coolDownTime.TotalMinutes.ToString("0.0") + " Minute(n)";
-            if (coolDownTime.TotalMinutes > 180)
+            // UPVOTE
+            String responseText = "Stimme bereits abgegeben oder eigener Post";
+            if (this.posts.canUserVote(postingID, e.CallbackQuery.From.Id))
             {
-              msgCoolDownText = "(Spamvermeidung) Zeit bis zur nächsten Markiermöglichkeit: " + coolDownTime.TotalHours.ToString("0.0") + " Stunde(n)";
+              int votecount = this.authors.voteUpAndGetCount(e.CallbackQuery.From.Id, e.CallbackQuery.From.Username);
+              if (votecount != 0)
+              {
+                this.statistics.increaseInteraction();
+                this.authors.updateCredibility(this.posts.getAuthorID(postingID), votecount, 0);
+                this.posts.upvote(postingID, e.CallbackQuery.From.Id, votecount);
+                responseText = "Positivstimme erhalten";
+              }
+              else
+              {
+                responseText = "Fehler beim Abstimmen!";
+              }
             }
-            await this.telegramInputBot.AnswerCallbackQueryAsync(
+
+            await this.telegramPublishBot.AnswerCallbackQueryAsync(
               callbackQueryId: e.CallbackQuery.Id,
-              text: msgCoolDownText
+              text: responseText,
+              showAlert: true
             );
-            return;
           }
-          string responseText = "Beitrag bereits markiert oder eigener Post";
-          if (this.posts.canUserFlag(postingID, e.CallbackQuery.From.Id))
+
+          if (callbackAction.Equals(voteDownPrefix))
           {
-            this.statistics.increaseInteraction();
-            this.authors.resetCoolDown(e.CallbackQuery.From.Id, e.CallbackQuery.From.Username, Author.InteractionCooldownTimer.FLAGGING);
-            this.posts.flag(postingID, e.CallbackQuery.From.Id);
-            responseText = "Beitrag für Moderation markiert";           
+            // DOWNVOTE
+            String responseText = "Stimme bereits abgegeben oder eigener Post";
+            if (this.posts.canUserVote(postingID, e.CallbackQuery.From.Id))
+            {
+              int votecount = this.authors.voteDownAndGetCount(e.CallbackQuery.From.Id, e.CallbackQuery.From.Username);
+              if (votecount != 0)
+              {
+                this.statistics.increaseInteraction();
+                this.authors.updateCredibility(this.posts.getAuthorID(postingID), 0, votecount);
+                this.posts.downvote(postingID, e.CallbackQuery.From.Id, votecount);
+                responseText = "Negativstimme erhalten";
+              }
+              else
+              {
+                responseText = "Fehler beim Abstimmen!";
+              }
+            }
+
+            await this.telegramPublishBot.AnswerCallbackQueryAsync(
+              callbackQueryId: e.CallbackQuery.Id,
+              text: responseText,
+              showAlert: true
+            );
           }
-          await this.telegramPublishBot.AnswerCallbackQueryAsync(
-            callbackQueryId: e.CallbackQuery.Id,
-            text: responseText,
-            showAlert: true
-          );
+
+          if (callbackAction.Equals(flagPrefix))
+          {
+            // Flagging
+            if (!this.authors.isCoolDownOver(e.CallbackQuery.From.Id, e.CallbackQuery.From.Username,
+              Author.InteractionCooldownTimer.FLAGGING))
+            {
+              TimeSpan coolDownTime = this.authors.getCoolDownTimer(e.CallbackQuery.From.Id,
+                e.CallbackQuery.From.Username, Author.InteractionCooldownTimer.FLAGGING);
+              String msgCoolDownText = "(Spamvermeidung) Zeit bis zur nächsten Markiermöglichkeit: " +
+                                       coolDownTime.TotalMinutes.ToString("0.0") + " Minute(n)";
+              if (coolDownTime.TotalMinutes > 180)
+              {
+                msgCoolDownText = "(Spamvermeidung) Zeit bis zur nächsten Markiermöglichkeit: " +
+                                  coolDownTime.TotalHours.ToString("0.0") + " Stunde(n)";
+              }
+
+              await this.telegramInputBot.AnswerCallbackQueryAsync(
+                callbackQueryId: e.CallbackQuery.Id,
+                text: msgCoolDownText,
+                showAlert: true
+              );
+              return;
+            }
+
+            string responseText = "Beitrag bereits markiert oder eigener Post";
+            if (this.posts.canUserFlag(postingID, e.CallbackQuery.From.Id))
+            {
+              this.statistics.increaseInteraction();
+              this.authors.resetCoolDown(e.CallbackQuery.From.Id, e.CallbackQuery.From.Username,
+                Author.InteractionCooldownTimer.FLAGGING);
+              this.posts.flag(postingID, e.CallbackQuery.From.Id);
+              responseText = "Beitrag für Moderation markiert";
+            }
+
+            await this.telegramPublishBot.AnswerCallbackQueryAsync(
+              callbackQueryId: e.CallbackQuery.Id,
+              text: responseText,
+              showAlert: true
+            );
+          }
         }
+      }
+      catch (Exception ex)
+      {
+        logger.Error(ex, "Genereller Fehler");
       }
     }
 

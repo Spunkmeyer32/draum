@@ -240,12 +240,19 @@ namespace DRaumServerApp
     internal IEnumerable<long> getTextDirtyPosts()
     {
       List<long> postlist = new List<long>();
-      foreach (Posting posting in this.postings.Values)
+      try
       {
-        if (posting.isTextDirty())
+        foreach (Posting posting in this.postings.Values)
         {
-          postlist.Add(posting.getPostID());
+          if (posting.isTextDirty())
+          {
+            postlist.Add(posting.getPostID());
+          }
         }
+      }
+      catch (Exception ex)
+      {
+        logger.Error(ex, "Fehler beim Anlegen der Liste geänderter Posts");
       }
       return postlist;
     }
@@ -253,12 +260,19 @@ namespace DRaumServerApp
     internal IEnumerable<long> getFlaggedPosts()
     {
       List<long> postlist = new List<long>();
-      foreach (Posting posting in this.postings.Values)
+      try
       {
-        if (posting.isFlagged())
+        foreach (Posting posting in this.postings.Values)
         {
-          postlist.Add(posting.getPostID());
+          if (posting.isFlagged())
+          {
+            postlist.Add(posting.getPostID());
+          }
         }
+      }
+      catch (Exception ex)
+      {
+        logger.Error(ex, "Fehler beim Anlegen der Liste geflaggter Posts");
       }
       return postlist;
     }
@@ -474,6 +488,14 @@ namespace DRaumServerApp
       }
     }
 
+    internal int getFlagCountOfPost(long postID)
+    {
+      if (this.postings.ContainsKey(postID))
+      {
+        return this.postings[postID].getFlagCount();
+      }
+      return -1;
+    }
 
     internal bool removePost(long postingID)
     {
@@ -497,6 +519,11 @@ namespace DRaumServerApp
 
     internal void updateTopPostStatus(DRaumStatistics statistics)
     {
+      if (statistics == null)
+      {
+        logger.Warn("Statistik-Objekt war null und Postings werden nicht geupdatet");
+        return;
+      }
       foreach (Posting posting in this.postings.Values)
       {
         if (statistics.isTopPost(posting.getUpVotePercentage(), posting.getVoteCount()))
@@ -593,7 +620,23 @@ namespace DRaumServerApp
       }
     }
 
+    internal long getMedianVotes()
+    {
+      List<long> voteCounts = new List<long>();
+      foreach (Posting posting in this.postings.Values)
+      {
+        voteCounts.Add(posting.getVoteCount());
+      }
+      if (voteCounts.Count > 1)
+      {
+        long[] countArray = voteCounts.ToArray();
+        Array.Sort(countArray);
+        return countArray[countArray.Length / 2];
+      }
+      return 5;
+    }
 
+   
   }
 
 

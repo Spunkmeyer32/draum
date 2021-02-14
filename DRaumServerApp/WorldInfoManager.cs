@@ -8,70 +8,71 @@ namespace DRaumServerApp
 {
   class WorldInfoManager
   {
-    private static NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
+    private static readonly NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
 
-    private float goldPriceInEuro = 0.0f;
-    private float silverPriceInEuro = 0.0f;
-    private float unleadedFuelPriceInEuro = 0.0f;
-    private float unleadedBioFuelPriceInEuro = 0.0f;
-    private float dieselFuelPriceInEuro = 0.0f;
-    private float bitcoinInEuro = 0.0f;
+    private float goldPriceInEuro;
+    private float silverPriceInEuro;
+    private float unleadedFuelPriceInEuro;
+    private float unleadedBioFuelPriceInEuro;
+    private float dieselFuelPriceInEuro;
+    private float bitcoinInEuro;
 
-    private static String trendUp = "↗️";
-    private static String trendDown = "↘️";
-    private static String trendEqual = "➡️";
+    private const string TrendUp = "↗️";
+    private const string TrendDown = "↘️";
+    private const string TrendEqual = "➡️";
 
-    private String goldPriceInEuroTrend =  trendEqual;
-    private String silverPriceInEuroTrend = trendEqual;
-    private String unleadedFuelPriceInEuroTrend = trendEqual;
-    private String unleadedBioFuelPriceInEuroTrend = trendEqual;
-    private String dieselFuelPriceInEuroTrend = trendEqual;
-    private String bitcoinInEuroTrend = trendEqual;
+    private string goldPriceInEuroTrend =  TrendEqual;
+    private string silverPriceInEuroTrend = TrendEqual;
+    private string unleadedFuelPriceInEuroTrend = TrendEqual;
+    private string unleadedBioFuelPriceInEuroTrend = TrendEqual;
+    private string dieselFuelPriceInEuroTrend = TrendEqual;
+    private string bitcoinInEuroTrend = TrendEqual;
 
-    private String infoString = "";
+    private string infoString = "";
     private DateTime lastCheck = DateTime.Now;
+    private static readonly CultureInfo currencyCulture = Utilities.usedCultureInfo;
 
-    
 
-    public String getInfoStringForChat()
+    public string getInfoStringForChat()
     {
-      if ((DateTime.Now - this.lastCheck).TotalHours >= 24.0 || this.infoString.Length < 10)
+      if (!((DateTime.Now - this.lastCheck).TotalHours >= 24.0) && this.infoString.Length >= 10)
       {
-        this.lastCheck = DateTime.Now;
-        // Daten einholen und in infoString speichern
-        try
+        return this.infoString;
+      }
+      this.lastCheck = DateTime.Now;
+      // Daten einholen und in infoString speichern
+      try
+      {
+        this.getBitcoin();
+        this.getFuelprice();
+        this.getGold();
+        this.getSilver();
+        if (this.infoString.Length < 10)
         {
-          this.getBitcoin();
-          this.getFuelprice();
-          this.getGold();
-          this.getSilver();
-          if (this.infoString.Length < 10)
-          {
-            // Keine alten Daten, keine Trends anzeigen
-            this.infoString = "== Tagesinfo ==\r\n\r\n🟡 Gold:  " + this.goldPriceInEuro.ToString("C", CultureInfo.CreateSpecificCulture("de-DE")) + "\r\n" +
-              "⚪️ Silber:  " + this.silverPriceInEuro.ToString("C", CultureInfo.CreateSpecificCulture("de-DE")) + "\r\n" +
-              "⛽️ Super-Benzin:  " + this.unleadedFuelPriceInEuro.ToString("C", CultureInfo.CreateSpecificCulture("de-DE")) + "\r\n" +
-              "⛽️ Super-E10:  " + this.unleadedBioFuelPriceInEuro.ToString("C", CultureInfo.CreateSpecificCulture("de-DE")) + "\r\n" +
-              "⛽️ Diesel:  " + this.dieselFuelPriceInEuro.ToString("C", CultureInfo.CreateSpecificCulture("de-DE")) + "\r\n" +
-              "💰 Bitcoin:  " + this.bitcoinInEuro.ToString("C", CultureInfo.CreateSpecificCulture("de-DE")) + "\r\n\r\n" +
-              "🔈 Aktualisierung am " + this.lastCheck.ToShortDateString() + " um " + this.lastCheck.ToShortTimeString() + " Uhr";
-          }
-          else
-          {
-            this.infoString = "== Tagesinfo ==\r\n\r\n🟡 Gold:  " + this.goldPriceInEuro.ToString("C", CultureInfo.CreateSpecificCulture("de-DE")) + "  " + this.goldPriceInEuroTrend + "\r\n" +
-              "⚪️ Silber:  " + this.silverPriceInEuro.ToString("C", CultureInfo.CreateSpecificCulture("de-DE")) + "  " + this.silverPriceInEuroTrend + "\r\n" +
-              "⛽️ Super-Benzin:  " + this.unleadedFuelPriceInEuro.ToString("C", CultureInfo.CreateSpecificCulture("de-DE")) + "  " + this.unleadedFuelPriceInEuroTrend + "\r\n" +
-              "⛽️ Super-E10:  " + this.unleadedBioFuelPriceInEuro.ToString("C", CultureInfo.CreateSpecificCulture("de-DE")) + "  " + this.unleadedBioFuelPriceInEuroTrend + "\r\n" +
-              "⛽️ Diesel:  " + this.dieselFuelPriceInEuro.ToString("C", CultureInfo.CreateSpecificCulture("de-DE")) + "  " + this.dieselFuelPriceInEuroTrend + "\r\n" +
-              "💰 Bitcoin:  " + this.bitcoinInEuro.ToString("C", CultureInfo.CreateSpecificCulture("de-DE")) + "  " + this.bitcoinInEuroTrend + "\r\n\r\n" +
-              "🔈 Aktualisierung am " + this.lastCheck.ToShortDateString() + " um " + this.lastCheck.ToShortTimeString() + " Uhr";
-          }
+          // Keine alten Daten, keine Trends anzeigen
+          this.infoString = "== Tagesinfo ==\r\n\r\n🟡 Gold:  " + this.goldPriceInEuro.ToString("C", currencyCulture) + "\r\n" +
+                            "⚪️ Silber:  " + this.silverPriceInEuro.ToString("C", currencyCulture) + "\r\n" +
+                            "⛽️ Super-Benzin:  " + this.unleadedFuelPriceInEuro.ToString("C", currencyCulture) + "\r\n" +
+                            "⛽️ Super-E10:  " + this.unleadedBioFuelPriceInEuro.ToString("C", currencyCulture) + "\r\n" +
+                            "⛽️ Diesel:  " + this.dieselFuelPriceInEuro.ToString("C", currencyCulture) + "\r\n" +
+                            "💰 Bitcoin:  " + this.bitcoinInEuro.ToString("C", currencyCulture) + "\r\n\r\n" +
+                            "🔈 Aktualisierung am " + this.lastCheck.ToShortDateString() + " um " + this.lastCheck.ToShortTimeString() + " Uhr";
         }
-        catch(Exception e)
+        else
         {
-          logger.Error(e, "Fehler beim holen der Informationen der WEB-APIs");
+          this.infoString = "== Tagesinfo ==\r\n\r\n🟡 Gold:  " + this.goldPriceInEuro.ToString("C", currencyCulture) + "  " + this.goldPriceInEuroTrend + "\r\n" +
+                            "⚪️ Silber:  " + this.silverPriceInEuro.ToString("C", currencyCulture) + "  " + this.silverPriceInEuroTrend + "\r\n" +
+                            "⛽️ Super-Benzin:  " + this.unleadedFuelPriceInEuro.ToString("C", currencyCulture) + "  " + this.unleadedFuelPriceInEuroTrend + "\r\n" +
+                            "⛽️ Super-E10:  " + this.unleadedBioFuelPriceInEuro.ToString("C", currencyCulture) + "  " + this.unleadedBioFuelPriceInEuroTrend + "\r\n" +
+                            "⛽️ Diesel:  " + this.dieselFuelPriceInEuro.ToString("C", currencyCulture) + "  " + this.dieselFuelPriceInEuroTrend + "\r\n" +
+                            "💰 Bitcoin:  " + this.bitcoinInEuro.ToString("C", currencyCulture) + "  " + this.bitcoinInEuroTrend + "\r\n\r\n" +
+                            "🔈 Aktualisierung am " + this.lastCheck.ToShortDateString() + " um " + this.lastCheck.ToShortTimeString() + " Uhr";
         }
-      } 
+      }
+      catch(Exception e)
+      {
+        logger.Error(e, "Fehler beim holen der Informationen der WEB-APIs");
+      }
       return this.infoString;
     }
 
@@ -84,23 +85,30 @@ namespace DRaumServerApp
       request.AddHeader("Content-Type", "application/json");
       IRestResponse response = client.Execute(request);
       JObject jsonResponse = JObject.Parse(response.Content);
-      float temp = jsonResponse.GetValue("price").ToObject<float>();
-      if (this.goldPriceInEuro < temp)
+      try
       {
-        this.goldPriceInEuroTrend = trendUp;
-      }
-      else
-      {
-        if (this.goldPriceInEuro > temp)
+        float temp = jsonResponse.GetValue("price").ToObject<float>();
+        if (this.goldPriceInEuro < temp)
         {
-          this.goldPriceInEuroTrend = trendDown;
+          this.goldPriceInEuroTrend = TrendUp;
         }
         else
         {
-          this.goldPriceInEuroTrend = trendEqual;
+          if (this.goldPriceInEuro > temp)
+          {
+            this.goldPriceInEuroTrend = TrendDown;
+          }
+          else
+          {
+            this.goldPriceInEuroTrend = TrendEqual;
+          }
         }
+        this.goldPriceInEuro = temp;
       }
-      this.goldPriceInEuro = temp;
+      catch (NullReferenceException nre)
+      {
+        logger.Error(nre, "Null beim Abfragen des Goldpreises");
+      }
     }
 
     private void getSilver()
@@ -111,86 +119,100 @@ namespace DRaumServerApp
       request.AddHeader("Content-Type", "application/json");
       IRestResponse response = client.Execute(request);
       JObject jsonResponse = JObject.Parse(response.Content);
-      float temp = jsonResponse.GetValue("price").ToObject<float>();
-      if (this.silverPriceInEuro < temp)
+      try
       {
-        this.silverPriceInEuroTrend = trendUp;
-      }
-      else
-      {
-        if (this.silverPriceInEuro > temp)
+        float temp = jsonResponse.GetValue("price").ToObject<float>();
+        if (this.silverPriceInEuro < temp)
         {
-          this.silverPriceInEuroTrend = trendDown;
+          this.silverPriceInEuroTrend = TrendUp;
         }
         else
         {
-          this.silverPriceInEuroTrend = trendEqual;
+          if (this.silverPriceInEuro > temp)
+          {
+            this.silverPriceInEuroTrend = TrendDown;
+          }
+          else
+          {
+            this.silverPriceInEuroTrend = TrendEqual;
+          }
         }
+        this.silverPriceInEuro = temp;
       }
-      this.silverPriceInEuro = temp;
+      catch (NullReferenceException nre)
+      {
+        logger.Error(nre, "Null beim Abfragen des Silberpreises");
+      }
     }
 
     private void getFuelprice()
     {
-      String url = "https://creativecommons.tankerkoenig.de/json/prices.php?ids="+ 
+      string url = "https://creativecommons.tankerkoenig.de/json/prices.php?ids="+ 
         ConfigurationManager.AppSettings["infoAPIIDFuel"] + "&apikey="+ 
         ConfigurationManager.AppSettings["infoAPIKeyFuel"];
-    var client = new RestClient(url);
+      var client = new RestClient(url);
       var request = new RestRequest(Method.GET);
       request.AddHeader("Content-Type", "application/json");
       IRestResponse response = client.Execute(request);
       JObject jsonResponse = JObject.Parse(response.Content);
-      float temp = jsonResponse.GetValue("prices").First.First["e5"].ToObject<float>();
-      if (this.unleadedFuelPriceInEuro < temp)
+      try
       {
-        this.unleadedFuelPriceInEuroTrend = trendUp;
-      }
-      else
-      {
-        if (this.unleadedFuelPriceInEuro > temp)
+        float temp = jsonResponse.GetValue("prices").First.First["e5"].ToObject<float>();
+        if (this.unleadedFuelPriceInEuro < temp)
         {
-          this.unleadedFuelPriceInEuroTrend = trendDown;
+          this.unleadedFuelPriceInEuroTrend = TrendUp;
         }
         else
         {
-          this.unleadedFuelPriceInEuroTrend = trendEqual;
+          if (this.unleadedFuelPriceInEuro > temp)
+          {
+            this.unleadedFuelPriceInEuroTrend = TrendDown;
+          }
+          else
+          {
+            this.unleadedFuelPriceInEuroTrend = TrendEqual;
+          }
         }
-      }
-      this.unleadedFuelPriceInEuro = temp;
-      temp = jsonResponse.GetValue("prices").First.First["e10"].ToObject<float>();
-      if (this.unleadedBioFuelPriceInEuro < temp)
-      {
-        this.unleadedBioFuelPriceInEuroTrend = trendUp;
-      }
-      else
-      {
-        if (this.unleadedBioFuelPriceInEuro > temp)
+        this.unleadedFuelPriceInEuro = temp;
+        temp = jsonResponse.GetValue("prices").First.First["e10"].ToObject<float>();
+        if (this.unleadedBioFuelPriceInEuro < temp)
         {
-          this.unleadedBioFuelPriceInEuroTrend = trendDown;
+          this.unleadedBioFuelPriceInEuroTrend = TrendUp;
         }
         else
         {
-          this.unleadedBioFuelPriceInEuroTrend = trendEqual;
+          if (this.unleadedBioFuelPriceInEuro > temp)
+          {
+            this.unleadedBioFuelPriceInEuroTrend = TrendDown;
+          }
+          else
+          {
+            this.unleadedBioFuelPriceInEuroTrend = TrendEqual;
+          }
         }
-      }
-      this.unleadedBioFuelPriceInEuro = temp;
-      temp = jsonResponse.GetValue("prices").First.First["diesel"].ToObject<float>();
-      if (this.dieselFuelPriceInEuro < temp)
-      {
-        this.dieselFuelPriceInEuroTrend = trendUp;
-      }
-      else
-      {
-        if (this.dieselFuelPriceInEuro > temp)
+        this.unleadedBioFuelPriceInEuro = temp;
+        temp = jsonResponse.GetValue("prices").First.First["diesel"].ToObject<float>();
+        if (this.dieselFuelPriceInEuro < temp)
         {
-          this.dieselFuelPriceInEuroTrend = trendDown;
+          this.dieselFuelPriceInEuroTrend = TrendUp;
         }
         else
         {
-          this.dieselFuelPriceInEuroTrend = trendEqual;
+          if (this.dieselFuelPriceInEuro > temp)
+          {
+            this.dieselFuelPriceInEuroTrend = TrendDown;
+          }
+          else
+          {
+            this.dieselFuelPriceInEuroTrend = TrendEqual;
+          }
         }
+        this.dieselFuelPriceInEuro = temp;
       }
-      this.dieselFuelPriceInEuro = temp;
+      catch (NullReferenceException nre)
+      {
+        logger.Error(nre, "Null beim Abfragen des Treibstoffpreises");
+      }
     }
 
     private void getBitcoin()
@@ -201,25 +223,31 @@ namespace DRaumServerApp
       request.AddHeader("X-CoinAPI-Key", ConfigurationManager.AppSettings["infoAPIKeyBitcoin"]);
       IRestResponse response = client.Execute(request);
       JObject jsonResponse = JObject.Parse(response.Content);
-      float temp = jsonResponse.GetValue("rate").ToObject<float>();
-      if (this.bitcoinInEuro < temp)
+      try
       {
-        this.bitcoinInEuroTrend = trendUp;
-      }
-      else
-      {
-        if (this.bitcoinInEuro > temp)
+        float temp = jsonResponse.GetValue("rate").ToObject<float>();
+        if (this.bitcoinInEuro < temp)
         {
-          this.bitcoinInEuroTrend = trendDown;
+          this.bitcoinInEuroTrend = TrendUp;
         }
         else
         {
-          this.bitcoinInEuroTrend = trendEqual;
+          if (this.bitcoinInEuro > temp)
+          {
+            this.bitcoinInEuroTrend = TrendDown;
+          }
+          else
+          {
+            this.bitcoinInEuroTrend = TrendEqual;
+          }
         }
+        this.bitcoinInEuro = temp;
       }
-      this.bitcoinInEuro = temp;
+      catch (NullReferenceException nre)
+      {
+        logger.Error(nre, "Null beim Abfragen des Bitcoinpreises");
+      }
     }
-
 
   }
 }
