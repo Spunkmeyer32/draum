@@ -42,7 +42,7 @@ namespace DRaumServerApp
       return null;
     }
 
-    private Author getAuthor(long authorID, String externalName) 
+    private Author getAuthor(long authorID, string externalName) 
     {
       if (this.authors.ContainsKey(authorID))
       {
@@ -102,7 +102,7 @@ namespace DRaumServerApp
       topOut = toplevel;      
     }
 
-    internal void setPostMode(long id, String externalName)
+    internal void setPostMode(long id, string externalName)
     {
       Author author = this.getAuthor(id, externalName);
       author.setPostMode();
@@ -118,43 +118,43 @@ namespace DRaumServerApp
       return PostingPublishManager.publishHourType.NONE;
     }
 
-    internal bool isPostMode(long id, String externalName)
+    internal bool isPostMode(long id, string externalName)
     {
       Author author = this.getAuthor(id, externalName);
       return author.isInPostMode();
     }
 
-    internal void unsetModes(int id, String externalName)
+    internal void unsetModes(long id, string externalName)
     {
       Author author = this.getAuthor(id, externalName);
       author.unsetModes();
     }
 
-    internal void setFeedbackMode(int id, String externalName)
+    internal void setFeedbackMode(long id, string externalName)
     {
       Author author = this.getAuthor(id, externalName);
       author.setFeedbackMode();
     }
 
-    internal bool isFeedbackMode(int id, String externalName)
+    internal bool isFeedbackMode(long id, string externalName)
     {
       Author author = this.getAuthor(id, externalName);
       return author.isInFeedbackMode();
     }
 
-    internal bool isCoolDownOver(int id, string externalName, InteractionCooldownTimer timerType)
+    internal bool isCoolDownOver(long id, string externalName, InteractionCooldownTimer timerType)
     {
       Author author = this.getAuthor(id, externalName);
       return author.coolDownOver(timerType);
     }
 
-    internal void resetCoolDown(int id, string externalName, InteractionCooldownTimer timerType)
+    internal void resetCoolDown(long id, string externalName, InteractionCooldownTimer timerType)
     {
       Author author = this.getAuthor(id, externalName);
       author.resetCoolDown(timerType);
     }
 
-    internal TimeSpan getCoolDownTimer(int id, string externalName, InteractionCooldownTimer timerType)
+    internal TimeSpan getCoolDownTimer(long id, string externalName, InteractionCooldownTimer timerType)
     {
       Author author = this.getAuthor(id, externalName);
       return author.getCoolDownTimer(timerType);

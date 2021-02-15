@@ -7,6 +7,10 @@ namespace DRaumServerApp.telegram
   {
     private static InlineKeyboardMarkup _getNextPostToModerateKeyboard;
 
+    /// <summary>
+    /// [ Beitrag laden ]
+    /// </summary>
+    /// <returns></returns>
     internal static InlineKeyboardMarkup getGetNextPostToModerateKeyboard()
     {
       if (_getNextPostToModerateKeyboard == null)
@@ -20,6 +24,12 @@ namespace DRaumServerApp.telegram
       return _getNextPostToModerateKeyboard;
     }
 
+    /// <summary>
+    /// [ Lesen und Abstimmen -> ]
+    /// </summary>
+    /// <param name="messageId">Msg-ID des Posts im Draum</param>
+    /// <param name="roomname">Chat-Name des Draums für den Link</param>
+    /// <returns></returns>
     internal static InlineKeyboardMarkup getTopPostLinkKeyboard(long messageId, string roomname)
     {
       InlineKeyboardButton linkbutton = InlineKeyboardButton.WithUrl("Lesen und Abstimmen", "https://t.me/" + roomname + "/" + messageId);
@@ -30,6 +40,25 @@ namespace DRaumServerApp.telegram
       return new InlineKeyboardMarkup(buttonlist);
     }
 
+    /// <summary>
+    /// [ Verstanden, Ausblenden ]
+    /// </summary>
+    /// <returns></returns>
+    internal static InlineKeyboardMarkup getGotItDeleteButtonKeyboard()
+    {
+      InlineKeyboardButton gotItButton = InlineKeyboardButton.WithCallbackData("Verstanden, Ausblenden", DRaumManager.genericMessageDeletePrefix+"0");
+      List<InlineKeyboardButton> buttonlist = new List<InlineKeyboardButton>
+      {
+        gotItButton
+      };
+      return new InlineKeyboardMarkup(buttonlist);
+    }
+
+    /// <summary>
+    /// [ Beitrag löschen ] [ Flag entfernen ]
+    /// </summary>
+    /// <param name="postId">ID des geflaggten Posts</param>
+    /// <returns></returns>
     internal static InlineKeyboardMarkup getFlaggedPostModKeyboard(long postId)
     {
       InlineKeyboardButton deleteButton = InlineKeyboardButton.WithCallbackData("Beitrag löschen", DRaumManager.modDeletePrefix + postId);
@@ -42,6 +71,65 @@ namespace DRaumServerApp.telegram
       return new InlineKeyboardMarkup(buttonlist);
     }
 
+    /// <summary>
+    /// [ Beitrag schreiben ] [ Feedback schreiben ]
+    /// </summary>
+    /// <returns></returns>
+    internal static InlineKeyboardMarkup getChooseInputModeKeyboard()
+    {
+      InlineKeyboardButton writeButton = InlineKeyboardButton.WithCallbackData("Beitrag schreiben", DRaumManager.modeWritePrefix + "0");
+      InlineKeyboardButton feedbackButton = InlineKeyboardButton.WithCallbackData("Feedback schreiben", DRaumManager.modeFeedbackPrefix + "0");
+      List<InlineKeyboardButton> buttonlist = new List<InlineKeyboardButton>
+      {
+        writeButton,
+        feedbackButton
+      };
+      return new InlineKeyboardMarkup(buttonlist);
+    }
+
+    /// <summary>
+    /// [ Veröffentlichen ] [ Ablehnen ]
+    /// </summary>
+    /// <param name="postId">PostID des moderierten Posts, welches der User veröffentlichen oder ablehnen kann</param>
+    /// <returns></returns>
+    internal static InlineKeyboardMarkup getAcceptDeclineModeratedPostKeyboard(long postId)
+    {
+      InlineKeyboardButton acceptButton = InlineKeyboardButton.WithCallbackData("Veröffentlichen", DRaumManager.modAcceptPrefix + postId);
+      InlineKeyboardButton cancelButton = InlineKeyboardButton.WithCallbackData("Ablehnen", DRaumManager.modBlockPrefix + postId);
+      List<InlineKeyboardButton> buttonlist = new List<InlineKeyboardButton>
+      {
+        acceptButton,
+        cancelButton
+      };
+      return new InlineKeyboardMarkup(buttonlist);
+    }
+
+    /// <summary>
+    /// [ OK ] [ EDIT ] [ BLOCK ]
+    /// </summary>
+    /// <param name="postId">PostID des Posts der Moderiert werden soll</param>
+    /// <returns></returns>
+    internal static InlineKeyboardMarkup getModeratePostKeyboard(long postId)
+    {
+      InlineKeyboardButton okayButton = InlineKeyboardButton.WithCallbackData("OK", DRaumManager.modAcceptPrefix + postId);
+      InlineKeyboardButton modifyButton = InlineKeyboardButton.WithCallbackData("EDIT", DRaumManager.modEditPrefix + postId);
+      InlineKeyboardButton blockButton = InlineKeyboardButton.WithCallbackData("BLOCK", DRaumManager.modBlockPrefix + postId);
+      List<InlineKeyboardButton> buttonlist = new List<InlineKeyboardButton>
+      {
+        okayButton,
+        modifyButton,
+        blockButton
+      };
+      return new InlineKeyboardMarkup(buttonlist);
+    }
+
+
+    /// <summary>
+    /// [ 👍 x% ] [ 👎 y% ] [ 🚩 Melden ]
+    /// </summary>
+    /// <param name="upvotePercentage"></param>
+    /// <param name="postId"></param>
+    /// <returns></returns>
     internal static InlineKeyboardMarkup getPostKeyboard(int upvotePercentage, long postId)
     {
       int downvotePercentage = 100 - upvotePercentage;

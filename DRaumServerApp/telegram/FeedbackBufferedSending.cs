@@ -8,7 +8,7 @@ using Telegram.Bot.Types.ReplyMarkups;
 
 namespace DRaumServerApp.telegram
 {
-  public class FeedbackBufferedSending
+  internal class FeedbackBufferedSending
   {
     private static readonly NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
 

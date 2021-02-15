@@ -5,14 +5,14 @@ using System.Text;
 
 namespace DRaumServerApp
 {
-  class Utilities
+  internal class Utilities
   {
-    private static NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
+    private static readonly NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
 
     private static bool nextLevelCalculated = false;
     private static long[] nextLevelExp;
 
-    public static bool RUNNINGINTESTMODE = false;
+    public static bool RUNNINGINTESTMODE = true;
 
     public static CultureInfo usedCultureInfo = CultureInfo.CreateSpecificCulture("de-DE");
 

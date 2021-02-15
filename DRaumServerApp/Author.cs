@@ -27,7 +27,7 @@ namespace DRaumServerApp
     [JsonProperty]
     private long authorID;
     [JsonProperty]
-    private String externalUserName;
+    private string authorName;
     [JsonProperty]
     private bool postmode;
     [JsonProperty]
@@ -48,20 +48,19 @@ namespace DRaumServerApp
     internal Author()
     {
       this.loadDefaults();
-      this.coolDownTimeStamp = DateTime.Now;
     }
 
-    internal Author(long authorID, String externalUserName)
+    internal Author(long authorId, string authorName)
     {
       this.loadDefaults();
-      this.authorID = authorID;
-      this.externalUserName = externalUserName;     
+      this.authorID = authorId;
+      this.authorName = authorName;     
     }
 
     private void loadDefaults()
     {
       this.authorID = -1;
-      this.externalUserName = "";
+      this.authorName = "";
       this.postmode = false;
       this.feedbackmode = false;
       this.coolDownTimeStamp = DateTime.Now;
@@ -120,7 +119,7 @@ namespace DRaumServerApp
 
     internal String getFullUserInfo()
     {
-      return "@"+this.externalUserName + " ("+this.authorID+")\r\n" + this.getUserInfo();
+      return "@"+this.authorName + " ("+this.authorID+")\r\n" + this.getUserInfo();
     }
 
     internal void publishedSuccessfully()
@@ -136,7 +135,7 @@ namespace DRaumServerApp
 
     internal String getExternalUserName()
     {
-      return this.externalUserName;
+      return this.authorName;
     }
 
     internal long getAuthorID()

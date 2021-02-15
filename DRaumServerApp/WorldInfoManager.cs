@@ -56,7 +56,7 @@ namespace DRaumServerApp
                             "⛽️ Super-E10:  " + this.unleadedBioFuelPriceInEuro.ToString("C", currencyCulture) + "\r\n" +
                             "⛽️ Diesel:  " + this.dieselFuelPriceInEuro.ToString("C", currencyCulture) + "\r\n" +
                             "💰 Bitcoin:  " + this.bitcoinInEuro.ToString("C", currencyCulture) + "\r\n\r\n" +
-                            "🔈 Aktualisierung am " + this.lastCheck.ToShortDateString() + " um " + this.lastCheck.ToShortTimeString() + " Uhr";
+                            "📅 Aktualisierung am " + this.lastCheck.ToShortDateString() + " um " + this.lastCheck.ToShortTimeString() + " Uhr";
         }
         else
         {
@@ -66,7 +66,7 @@ namespace DRaumServerApp
                             "⛽️ Super-E10:  " + this.unleadedBioFuelPriceInEuro.ToString("C", currencyCulture) + "  " + this.unleadedBioFuelPriceInEuroTrend + "\r\n" +
                             "⛽️ Diesel:  " + this.dieselFuelPriceInEuro.ToString("C", currencyCulture) + "  " + this.dieselFuelPriceInEuroTrend + "\r\n" +
                             "💰 Bitcoin:  " + this.bitcoinInEuro.ToString("C", currencyCulture) + "  " + this.bitcoinInEuroTrend + "\r\n\r\n" +
-                            "🔈 Aktualisierung am " + this.lastCheck.ToShortDateString() + " um " + this.lastCheck.ToShortTimeString() + " Uhr";
+                            "📅 Aktualisierung am " + this.lastCheck.ToShortDateString() + " um " + this.lastCheck.ToShortTimeString() + " Uhr";
         }
       }
       catch(Exception e)
