@@ -21,7 +21,7 @@ Willkommen in der Kommentarspalte des Internets auf Telegram ;-)
 === BETA-PHASE, bitte keine weiteren Leute einladen! ===
 
 Meine Idee:
-Auf Twitter kann man gut Stimmungen einzelner Echokammern/Filterblasen verfolgen.
+Auf Twitter und anderen Plattformen kann man gut Stimmungen einzelner Echokammern/Filterblasen verfolgen.
 Das verzerrt aufgrund der eigenen Filterblase und durch Blockierungen jedoch das Gesamtbild.
 
 Hier in diesem D-Raum auf Telegram sollen Meinungen aus verschiedenen 
@@ -666,6 +666,9 @@ namespace DRaumServerApp
             }
             await Task.Delay(3000);
           }
+
+          // TODO Abgelaufene Posts entfernen
+
         }
       }
 
@@ -1101,10 +1104,10 @@ namespace DRaumServerApp
         if(callbackData.getPrefix().Equals(modDeletePrefix))
         {
           // Der Admin entscheided den geflaggten Post zu entfernen
-          int messageID = this.posts.getMessageID(callbackData.getId());
+          int messageId = this.posts.getMessageID(callbackData.getId());
           int messageIdDaily = this.posts.getMessageIdDaily(callbackData.getId());
           int messageIdWeekly = this.posts.getMessageIdWeekly(callbackData.getId());
-          if (messageID != -1)
+          if (messageId != -1)
           {
             if (!this.posts.removePost(callbackData.getId()))
             {
@@ -1115,7 +1118,7 @@ namespace DRaumServerApp
               // Nachricht aus dem D-Raum löschen
               await this.telegramPublishBot.DeleteMessageAsync(
                 chatId: this.draumChatId,
-                messageId: messageID);
+                messageId: messageId);
               if (messageIdDaily != -1)
               {
                 await this.telegramPublishBot.DeleteMessageAsync(
@@ -1236,6 +1239,7 @@ namespace DRaumServerApp
           );
           return;
         }
+        // TODO Der Moderator blockt den Nutzer für einen Tag/ für eine Woche/ für einen Monat
         if(callbackData.getPrefix().Equals(genericMessageDeletePrefix))
         {
           await this.telegramModerateBot.DeleteMessageAsync(
@@ -1288,26 +1292,19 @@ namespace DRaumServerApp
         if (e.CallbackQuery.Data != null)
         {
           // Auswerten: Vote-up, Vote-down, Flag
-          string callbackData = e.CallbackQuery.Data;
-          string callbackAction = callbackData.Substring(0, 1);
-          string postidstring = callbackData.Substring(1);
-          long postingID = 0;
-          if (postidstring.Trim().Length > 0)
-          {
-            postingID = long.Parse(postidstring);
-          }
-          if (callbackAction.Equals(voteUpPrefix))
+          DRaumCallbackData callbackData = DRaumCallbackData.parseCallbackData(e.CallbackQuery.Data);
+          if (callbackData.getPrefix().Equals(voteUpPrefix))
           {
             // UPVOTE
             string responseText = "Stimme bereits abgegeben oder eigener Post";
-            if (this.posts.canUserVote(postingID, e.CallbackQuery.From.Id))
+            if (this.posts.canUserVote(callbackData.getId(), e.CallbackQuery.From.Id))
             {
               int votecount = this.authors.voteUpAndGetCount(e.CallbackQuery.From.Id, e.CallbackQuery.From.Username);
               if (votecount != 0)
               {
                 this.statistics.increaseInteraction();
-                this.authors.updateCredibility(this.posts.getAuthorID(postingID), votecount, 0);
-                this.posts.upvote(postingID, e.CallbackQuery.From.Id, votecount);
+                this.authors.updateCredibility(this.posts.getAuthorID(callbackData.getId()), votecount, 0);
+                this.posts.upvote(callbackData.getId(), e.CallbackQuery.From.Id, votecount);
                 responseText = "Positivstimme erhalten";
               }
               else
@@ -1320,19 +1317,20 @@ namespace DRaumServerApp
               text: responseText,
               showAlert: true
             );
+            return;
           }
-          if (callbackAction.Equals(voteDownPrefix))
+          if (callbackData.getPrefix().Equals(voteDownPrefix))
           {
             // DOWNVOTE
             string responseText = "Stimme bereits abgegeben oder eigener Post";
-            if (this.posts.canUserVote(postingID, e.CallbackQuery.From.Id))
+            if (this.posts.canUserVote(callbackData.getId(), e.CallbackQuery.From.Id))
             {
               int votecount = this.authors.voteDownAndGetCount(e.CallbackQuery.From.Id, e.CallbackQuery.From.Username);
               if (votecount != 0)
               {
                 this.statistics.increaseInteraction();
-                this.authors.updateCredibility(this.posts.getAuthorID(postingID), 0, votecount);
-                this.posts.downvote(postingID, e.CallbackQuery.From.Id, votecount);
+                this.authors.updateCredibility(this.posts.getAuthorID(callbackData.getId()), 0, votecount);
+                this.posts.downvote(callbackData.getId(), e.CallbackQuery.From.Id, votecount);
                 responseText = "Negativstimme erhalten";
               }
               else
@@ -1345,8 +1343,9 @@ namespace DRaumServerApp
               text: responseText,
               showAlert: true
             );
+            return;
           }
-          if (callbackAction.Equals(flagPrefix))
+          if (callbackData.getPrefix().Equals(flagPrefix))
           {
             // Flagging
             if (!this.authors.isCoolDownOver(e.CallbackQuery.From.Id, e.CallbackQuery.From.Username,
@@ -1369,12 +1368,12 @@ namespace DRaumServerApp
               return;
             }
             string responseText = "Beitrag bereits markiert oder eigener Post";
-            if (this.posts.canUserFlag(postingID, e.CallbackQuery.From.Id))
+            if (this.posts.canUserFlag(callbackData.getId(), e.CallbackQuery.From.Id))
             {
               this.statistics.increaseInteraction();
               this.authors.resetCoolDown(e.CallbackQuery.From.Id, e.CallbackQuery.From.Username,
                 Author.InteractionCooldownTimer.FLAGGING);
-              this.posts.flag(postingID, e.CallbackQuery.From.Id);
+              this.posts.flag(callbackData.getId(), e.CallbackQuery.From.Id);
               responseText = "Beitrag für Moderation markiert";
             }
             await this.telegramPublishBot.AnswerCallbackQueryAsync(
@@ -1382,6 +1381,7 @@ namespace DRaumServerApp
               text: responseText,
               showAlert: true
             );
+            return;
           }
         }
       }
@@ -1415,6 +1415,18 @@ namespace DRaumServerApp
         if (callbackData.getPrefix().Equals(modBlockPrefix))
         {
           await this.inputBot.sendMessage(e.CallbackQuery.From.Id, "Der Post wird nicht veröffentlicht und verworfen.");
+          return;
+        }
+        if (callbackData.getPrefix().Equals(modeWritePrefix))
+        {
+          await this.inputBot.switchToWriteMode(e.CallbackQuery.From.Id, e.CallbackQuery.From.Username,
+            e.CallbackQuery.From.Id);
+          return;
+        }
+        if (callbackData.getPrefix().Equals(modeFeedbackPrefix))
+        {
+          await this.inputBot.switchToFeedbackMode(e.CallbackQuery.From.Id, e.CallbackQuery.From.Username,
+            e.CallbackQuery.From.Id);
           return;
         }
       }
