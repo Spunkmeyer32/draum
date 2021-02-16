@@ -4,7 +4,7 @@ using System.Text;
 
 namespace DRaumServerApp
 {
-  class PostingPublishManager
+  internal class PostingPublishManager
   {
     private static NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
 
@@ -16,6 +16,17 @@ namespace DRaumServerApp
     private static int happyHour = premiumHour+1;
 
     private DateTime nextPublishSlot = new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day, DateTime.Now.Hour, 0, 0);
+
+    internal PostingPublishManager()
+    {
+      if (Utilities.RUNNINGINTESTMODE)
+      {
+        firstHour = 0;
+        lastHour = 23;
+        minutesBetween = 2;
+      }
+    }
+
 
     internal void calcNextSlot()
     {
@@ -43,7 +54,7 @@ namespace DRaumServerApp
     internal DateTime getTimestampOfNextSlot(int listsize, publishHourType publishType)
     {
       DateTime now = DateTime.Now;
-      DateTime nextslot = DateTime.Now;
+      DateTime nextslot;
       if (publishType.Equals(publishHourType.PREMIUM))
       {
         if (now.Hour == premiumHour)

@@ -70,14 +70,12 @@ namespace DRaumServerApp.telegram
             msgCoolDownText = "(Spamvermeidung) Zeit bis zum nächsten Posting: " +
                               coolDownTime.TotalHours.ToString("0.0") + " Stunde(n)";
           }
-
           await this.telegramInputBot.SendTextMessageAsync(
             chatId: chatid,
             text: msgCoolDownText
           );
           return;
         }
-
         this.statistics.increaseInteraction();
         this.authors.setPostMode(authorid, authorname);
         await this.telegramInputBot.SendTextMessageAsync(
@@ -91,6 +89,13 @@ namespace DRaumServerApp.telegram
       }
     }
 
+    /// <summary>
+    /// Wenn der Benutzer den Befehl für das Feedbackschreiben eingegeben hat
+    /// </summary>
+    /// <param name="authorid"></param>
+    /// <param name="authorname"></param>
+    /// <param name="chatid"></param>
+    /// <returns></returns>
     internal async Task switchToFeedbackMode(long authorid, string authorname, long chatid)
     {
       try
@@ -106,14 +111,12 @@ namespace DRaumServerApp.telegram
             msgCoolDownText = "(Spamvermeidung) Zeit bis zur nächsten Feedbackmöglichkeit: " +
                               coolDownTime.TotalHours.ToString("0.0") + " Stunde(n)";
           }
-
           await this.telegramInputBot.SendTextMessageAsync(
             chatId: chatid,
             text: msgCoolDownText
           );
           return;
         }
-
         this.statistics.increaseInteraction();
         this.authors.setFeedbackMode(authorid, authorname);
         await this.telegramInputBot.SendTextMessageAsync(
@@ -127,6 +130,14 @@ namespace DRaumServerApp.telegram
       }
     }
 
+    /// <summary>
+    /// Wird aufgerufen, wenn der Benutzer normalen Text (kein Kommando) eingegeben hat
+    /// </summary>
+    /// <param name="authorid"></param>
+    /// <param name="authorname"></param>
+    /// <param name="chatid"></param>
+    /// <param name="text"></param>
+    /// <returns></returns>
     internal async Task processTextInput(long authorid, string authorname, long chatid, string text)
     {
       try
@@ -143,7 +154,6 @@ namespace DRaumServerApp.telegram
             );
             return;
           }
-
           this.statistics.increaseInteraction();
           this.authors.resetCoolDown(authorid, authorname, Author.InteractionCooldownTimer.POSTING);
           this.authors.resetCoolDown(authorid, authorname, Author.InteractionCooldownTimer.DEFAULT);
@@ -155,7 +165,6 @@ namespace DRaumServerApp.telegram
           );
           return;
         }
-
         if (this.authors.isFeedbackMode(authorid, authorname))
         {
           // == Feedback ==
@@ -168,7 +177,6 @@ namespace DRaumServerApp.telegram
             );
             return;
           }
-
           this.statistics.increaseInteraction();
           this.authors.resetCoolDown(authorid, authorname, Author.InteractionCooldownTimer.FEEDBACK);
           this.authors.resetCoolDown(authorid, authorname, Author.InteractionCooldownTimer.DEFAULT);
@@ -181,7 +189,6 @@ namespace DRaumServerApp.telegram
           );
           return;
         }
-
         // Kein Modus
         await this.telegramInputBot.SendTextMessageAsync(
           chatId: chatid,

@@ -8,10 +8,10 @@ using static DRaumServerApp.Author;
 
 namespace DRaumServerApp
 {
-  class AuthorManager
+  internal class AuthorManager
   {
-    private static NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
-    public static int MAXMANAGEDUSERS = 25;
+    private static readonly NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
+    public static int Maxmanagedusers = 25;
 
     [JsonProperty]
     private ConcurrentDictionary<long, Author> authors;    
@@ -33,33 +33,33 @@ namespace DRaumServerApp
       }
     }
 
-    private Author getAuthor(long authorID)
+    private Author getAuthor(long authorId)
     {
-      if (this.authors.ContainsKey(authorID))
+      if (this.authors.ContainsKey(authorId))
       {
-        return this.authors[authorID];
+        return this.authors[authorId];
       }
       return null;
     }
 
-    private Author getAuthor(long authorID, string externalName) 
+    private Author getAuthor(long authorId, string externalName) 
     {
-      if (this.authors.ContainsKey(authorID))
+      if (this.authors.ContainsKey(authorId))
       {
-        return this.authors[authorID];
+        return this.authors[authorId];
       }
       else
       {
-        if (this.authors.Count < MAXMANAGEDUSERS)
+        if (this.authors.Count < Maxmanagedusers)
         {
           if (externalName == null)
           {
             externalName = "";
           }
-          Author newAuthor = new Author(authorID, externalName);
-          if (this.authors.TryAdd(authorID, newAuthor))
+          Author newAuthor = new Author(authorId, externalName);
+          if (this.authors.TryAdd(authorId, newAuthor))
           {
-            logger.Info("Neuer Autor: " + externalName + " (" + authorID + ")");
+            logger.Info("Neuer Autor: " + externalName + " (" + authorId + ")");
             return newAuthor;
           }
           else
@@ -79,7 +79,7 @@ namespace DRaumServerApp
       // alle Autoren Prüfen und Median und Top ermitteln
       int toplevel = 0;
       ArrayList levellist = new ArrayList();
-      int temp = 0;
+      int temp;
       foreach(Author author in this.authors.Values)
       {
         temp = author.getUserLevel();
@@ -108,9 +108,9 @@ namespace DRaumServerApp
       author.setPostMode();
     }
 
-    internal PostingPublishManager.publishHourType getPublishType(long authorID, int premiumLevelCap)
+    internal PostingPublishManager.publishHourType getPublishType(long authorId, int premiumLevelCap)
     {
-      Author author = this.getAuthor(authorID);
+      Author author = this.getAuthor(authorId);
       if(author != null)
       {
         return author.getPublishType(premiumLevelCap);
@@ -160,9 +160,9 @@ namespace DRaumServerApp
       return author.getCoolDownTimer(timerType);
     }
 
-    internal string getAuthorPostText(long authorID)
+    internal string getAuthorPostText(long authorId)
     {
-      Author author = this.getAuthor(authorID);
+      Author author = this.getAuthor(authorId);
       if(author == null)
       {
         return "<i>Schreiber/in nicht gefunden!</i>\r\n<i>Verfasst im D-Raum https://t.me/d_raum </i>";
@@ -170,35 +170,35 @@ namespace DRaumServerApp
       return "<i>" + author.getUserInfo() + "</i>\r\n<i>Verfasst im D-Raum https://t.me/d_raum </i>";
     }
 
-    internal void updateCredibility(long authorID, long receivedUpVotes, long receivedDownVotes)
+    internal void updateCredibility(long authorId, long receivedUpVotes, long receivedDownVotes)
     {
-      Author author = this.getAuthor(authorID);
+      Author author = this.getAuthor(authorId);
       if (author != null)
       {
         author.updateCredibility(receivedUpVotes, receivedDownVotes);
       }
       else
       {
-        logger.Warn("Konnte votes dem Nutzer mit der ID " + authorID + " nicht zuordnen");
+        logger.Warn("Konnte votes dem Nutzer mit der ID " + authorId + " nicht zuordnen");
       }
     }
 
-    internal void publishedSuccessfully(long authorID)
+    internal void publishedSuccessfully(long authorId)
     {
-      Author author = this.getAuthor(authorID);
+      Author author = this.getAuthor(authorId);
       if (author != null)
       {
         author.publishedSuccessfully();
       }
       else
       {
-        logger.Warn("Konnte die Veröffentlichung dem Nutzer mit der ID " + authorID + " nicht gutschreiben");
+        logger.Warn("Konnte die Veröffentlichung dem Nutzer mit der ID " + authorId + " nicht gutschreiben");
       }
     }
 
-    internal int voteUpAndGetCount(long authorID, string username)
+    internal int voteUpAndGetCount(long authorId, string username)
     {
-      Author author = this.getAuthor(authorID, username);
+      Author author = this.getAuthor(authorId, username);
       if (author != null)
       {
         return author.voteUpAndGetCount();
@@ -206,9 +206,9 @@ namespace DRaumServerApp
       return 0;
     }
 
-    internal int voteDownAndGetCount(long authorID, string username)
+    internal int voteDownAndGetCount(long authorId, string username)
     {
-      Author author = this.getAuthor(authorID,username);
+      Author author = this.getAuthor(authorId,username);
       if (author != null)
       {
         return author.voteDownAndGetCount();

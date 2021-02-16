@@ -17,9 +17,7 @@ namespace DRaumServerApp
     [JsonIgnore]
     private readonly object flagDataMutex = new object();
     [JsonIgnore]
-    private static readonly int DAYSUNTILDELETENORMAL = 76;
-
-
+    private static readonly int DAYSUNTILDELETENORMAL = 1; // 76
 
     [JsonIgnore]
     private readonly object upvoteMutex = new object();
@@ -180,10 +178,22 @@ namespace DRaumServerApp
       lock (this.publishTimestampMutex)
       {
         string result = "<i>Veröffentlicht am " + this.publishTimestamp.ToShortDateString() + " um " + this.publishTimestamp.ToShortTimeString() + " Uhr</i>";
-        TimeSpan ts = this.publishTimestamp.AddDays(this.daysBeforeDelete) - DateTime.Now;
-        result += "\r\n" + "<i>Wird in " + ((int)ts.TotalDays).ToString() + " Tagen gelöscht</i>";
+        DateTime deleteTime = this.publishTimestamp.AddDays(this.daysBeforeDelete);
+        result += "\r\n" + "<i>Wird voraussichtlich am " + deleteTime.ToShortDateString() + " gelöscht</i>";
         return result;
       }
+    }
+
+    internal bool shouldBeDeleted()
+    {
+      lock (this.publishTimestampMutex)
+      {
+        if (this.publishTimestamp.AddDays(this.daysBeforeDelete) < DateTime.Now)
+        {
+          return true;
+        }
+      }
+      return false;
     }
 
     internal bool canUserVote(long id)

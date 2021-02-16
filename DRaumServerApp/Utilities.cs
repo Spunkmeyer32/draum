@@ -24,7 +24,7 @@ namespace DRaumServerApp
         nextLevelExp = new long[500];
         for( int i = 0 ; i < 500 ; i++ )
         {
-          nextLevelExp[i] = (long)Math.Round(5 + 0.25 * (i ^ 3) + 0.5 * (i ^ 2) + 7 * i);
+          nextLevelExp[i] = (long)Math.Round(8 + 0.25 * (i ^ 3) + 0.6 * (i ^ 2) + 8 * i);
           
           expsum += nextLevelExp[i];
           if (i%10==0)

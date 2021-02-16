@@ -28,12 +28,12 @@ namespace DRaumServerApp
     }
   }
 
-  class PostingManager
+  internal class PostingManager
   {
     [JsonIgnore]
-    private static NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
+    private static readonly NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
     [JsonIgnore]
-    private PostingPublishManager publishManager = new PostingPublishManager();
+    private readonly PostingPublishManager publishManager = new PostingPublishManager();
     [JsonIgnore]
     private bool postsCheckChangeFlag = true;
 
@@ -64,7 +64,7 @@ namespace DRaumServerApp
       this.publishManager.calcNextSlot();
     }
 
-    internal void addPosting(String text, long authorID)
+    internal void addPosting(string text, long authorID)
     {
       Posting posting = new Posting(this.lastPostingId++,text, authorID);
       this.postingsToCheck.Enqueue(posting);
@@ -125,55 +125,55 @@ namespace DRaumServerApp
       }
     }
 
-    internal String acceptPost(long postingID, PostingPublishManager.publishHourType publishType)
+    internal string acceptPost(long postingId, PostingPublishManager.publishHourType publishType)
     {
-      if (this.postingsInCheck.ContainsKey(postingID))
+      if (!this.postingsInCheck.ContainsKey(postingId))
       {
-        Posting postingToAccept = this.postingsInCheck[postingID];
-        // Aus der einen Liste entfernen und in die Andere transferieren
-        this.postingsInCheck.Remove(postingToAccept.getPostID(), out postingToAccept);
-        this.postings.TryAdd(postingToAccept.getPostID(),postingToAccept);
-        if(publishType == PostingPublishManager.publishHourType.PREMIUM)
+        return "";
+      }
+      Posting postingToAccept = this.postingsInCheck[postingId];
+      // Aus der einen Liste entfernen und in die Andere transferieren
+      this.postingsInCheck.Remove(postingToAccept.getPostID(), out postingToAccept);
+      this.postings.TryAdd(postingToAccept.getPostID(),postingToAccept);
+      if(publishType == PostingPublishManager.publishHourType.PREMIUM)
+      {
+        DateTime nextFreeSlotPremium = this.publishManager.getTimestampOfNextSlot(this.postingsToPublishPremiumHour.Count, PostingPublishManager.publishHourType.PREMIUM);
+        DateTime nextFreeSlotNormal = this.publishManager.getTimestampOfNextSlot(this.postingsToPublish.Count, PostingPublishManager.publishHourType.NORMAL);
+        if(nextFreeSlotPremium < nextFreeSlotNormal)
         {
-          DateTime nextFreeSlotPremium = this.publishManager.getTimestampOfNextSlot(this.postingsToPublishPremiumHour.Count, PostingPublishManager.publishHourType.PREMIUM);
-          DateTime nextFreeSlotNormal = this.publishManager.getTimestampOfNextSlot(this.postingsToPublish.Count, PostingPublishManager.publishHourType.NORMAL);
-          if(nextFreeSlotPremium < nextFreeSlotNormal)
-          {
-            this.postingsToPublishPremiumHour.Enqueue(postingToAccept.getPostID());
-            return "Veröffentlichung voraussichtlich: " + nextFreeSlotPremium.ToString();
-          }
-          else
-          {
-            this.postingsToPublish.Enqueue(postingToAccept.getPostID());
-            return "Veröffentlichung voraussichtlich: " + nextFreeSlotNormal.ToString();
-          }          
+          this.postingsToPublishPremiumHour.Enqueue(postingToAccept.getPostID());
+          return "Veröffentlichung voraussichtlich: " + nextFreeSlotPremium.ToString(Utilities.usedCultureInfo);
         }
         else
         {
-          if(publishType == PostingPublishManager.publishHourType.HAPPY)
+          this.postingsToPublish.Enqueue(postingToAccept.getPostID());
+          return "Veröffentlichung voraussichtlich: " + nextFreeSlotNormal.ToString(Utilities.usedCultureInfo);
+        }          
+      }
+      else
+      {
+        if(publishType == PostingPublishManager.publishHourType.HAPPY)
+        {
+          DateTime nextFreeSlotHappy = this.publishManager.getTimestampOfNextSlot(this.postingsToPublishHappyHour.Count, PostingPublishManager.publishHourType.HAPPY);
+          DateTime nextFreeSlotNormal = this.publishManager.getTimestampOfNextSlot(this.postingsToPublish.Count, PostingPublishManager.publishHourType.NORMAL);
+          if (nextFreeSlotHappy < nextFreeSlotNormal)
           {
-            DateTime nextFreeSlotHappy = this.publishManager.getTimestampOfNextSlot(this.postingsToPublishHappyHour.Count, PostingPublishManager.publishHourType.HAPPY);
-            DateTime nextFreeSlotNormal = this.publishManager.getTimestampOfNextSlot(this.postingsToPublish.Count, PostingPublishManager.publishHourType.NORMAL);
-            if (nextFreeSlotHappy < nextFreeSlotNormal)
-            {
-              this.postingsToPublishHappyHour.Enqueue(postingToAccept.getPostID());
-              return "Veröffentlichung voraussichtlich: " + nextFreeSlotHappy.ToString();
-            }
-            else
-            {
-              this.postingsToPublish.Enqueue(postingToAccept.getPostID());
-              return "Veröffentlichung voraussichtlich: " + nextFreeSlotNormal.ToString();
-            }
+            this.postingsToPublishHappyHour.Enqueue(postingToAccept.getPostID());
+            return "Veröffentlichung voraussichtlich: " + nextFreeSlotHappy.ToString(Utilities.usedCultureInfo);
           }
           else
           {
-            DateTime nextFreeSlotNormal = this.publishManager.getTimestampOfNextSlot(this.postingsToPublish.Count, PostingPublishManager.publishHourType.NORMAL);
             this.postingsToPublish.Enqueue(postingToAccept.getPostID());
-            return "Veröffentlichung voraussichtlich: " + nextFreeSlotNormal.ToString();
+            return "Veröffentlichung voraussichtlich: " + nextFreeSlotNormal.ToString(Utilities.usedCultureInfo);
           }
         }
+        else
+        {
+          DateTime nextFreeSlotNormal = this.publishManager.getTimestampOfNextSlot(this.postingsToPublish.Count, PostingPublishManager.publishHourType.NORMAL);
+          this.postingsToPublish.Enqueue(postingToAccept.getPostID());
+          return "Veröffentlichung voraussichtlich: " + nextFreeSlotNormal.ToString(Utilities.usedCultureInfo);
+        }
       }
-      return "";
     }
 
     internal Posting getPostingInCheck(long nextPostModerationId)
@@ -295,10 +295,9 @@ namespace DRaumServerApp
       return new KeyValuePair<long, string>(-1, "");
     }
 
-    internal bool putBackIntoQueue(long postID)
+    internal bool putBackIntoQueue(long postingId)
     {
-      Posting posting;
-      if (this.postingsInCheck.TryRemove(postID, out posting))
+      if (this.postingsInCheck.TryRemove(postingId, out var posting))
       {
         // put back
         this.postingsToCheck.Enqueue(posting);
@@ -306,15 +305,14 @@ namespace DRaumServerApp
       }
       else
       {
-        logger.Error("Posting nicht in der Liste In-Check gefunden: " + postID);
+        logger.Error("Posting nicht in der Liste In-Check gefunden: " + postingId);
       }
       return false;
     }
 
     internal Posting removePostFromInCheck(long postID)
     {
-      Posting posting;     
-      if(!this.postingsInCheck.TryRemove(postID, out posting))
+      if(!this.postingsInCheck.TryRemove(postID, out var posting))
       {
         logger.Error("Konnte den Post nicht aus der Liste InCheck löschen: " + postID);
         return null;
@@ -322,36 +320,36 @@ namespace DRaumServerApp
       return posting;
     }
 
-    internal String getPostingTeaser(long postingID)
+    internal string getPostingTeaser(long postingId)
     {
-      if(this.postings.ContainsKey(postingID))
+      if(this.postings.ContainsKey(postingId))
       {
-        return this.postings[postingID].getPostingText().Substring(0, Math.Min(60, this.postings[postingID].getPostingText().Length)) + " [...]";
+        return this.postings[postingId].getPostingText().Substring(0, Math.Min(60, this.postings[postingId].getPostingText().Length)) + " [...]";
       }
-      if(this.postingsInCheck.ContainsKey(postingID))
+      if(this.postingsInCheck.ContainsKey(postingId))
       {
-        return this.postingsInCheck[postingID].getPostingText().Substring(0, Math.Min(60, this.postingsInCheck[postingID].getPostingText().Length)) + " [...]";
+        return this.postingsInCheck[postingId].getPostingText().Substring(0, Math.Min(60, this.postingsInCheck[postingId].getPostingText().Length)) + " [...]";
       }
-      logger.Error("Konnte den Teaser nicht laden: " + postingID);
+      logger.Error("Konnte den Teaser nicht laden: " + postingId);
       return "... Post nicht gefunden ...";
     }
 
-    internal long getAuthorID(long postingID)
+    internal long getAuthorID(long postingId)
     {
-      if(this.postings.ContainsKey(postingID))
+      if(this.postings.ContainsKey(postingId))
       {
-        return this.postings[postingID].getAuthorID();
+        return this.postings[postingId].getAuthorID();
       }
       foreach (Posting p in this.postingsToCheck)
       {
-        if (p.getPostID() == postingID)
+        if (p.getPostID() == postingId)
         {
           return p.getAuthorID();
         }
       }
-      if(this.postingsInCheck.ContainsKey(postingID))
+      if(this.postingsInCheck.ContainsKey(postingId))
       {
-        return this.postingsInCheck[postingID].getAuthorID();
+        return this.postingsInCheck[postingId].getAuthorID();
       }
       return -1;
     }
@@ -501,8 +499,7 @@ namespace DRaumServerApp
     {
       if (this.postings.ContainsKey(postingID))
       {
-        Posting posting;
-        return this.postings.TryRemove(postingID, out posting);
+        return this.postings.TryRemove(postingID, out var posting);
       }
       return false;
     }
@@ -535,6 +532,19 @@ namespace DRaumServerApp
           posting.setTopPostStatus(false);
         }
       }
+    }
+
+    internal List<long> getPostsToDelete()
+    {
+      List<long> resultList = new List<long>();
+      foreach (Posting posting in this.postings.Values)
+      {
+        if (posting.shouldBeDeleted())
+        {
+          resultList.Add(posting.getPostID());
+        }
+      }
+      return resultList;
     }
 
     internal List<long> getDailyTopPostsFromYesterday()
@@ -636,7 +646,15 @@ namespace DRaumServerApp
       return 5;
     }
 
-   
+
+    public bool deletePost(long postId)
+    {
+      if (this.postings.ContainsKey(postId))
+      {
+        return this.postings.Remove(postId,out _);
+      }
+      return false;
+    }
   }
 
 

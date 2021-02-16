@@ -17,6 +17,8 @@ namespace DRaumServerApp
       autoResetEvent.Set();
     }
 
+    // ReSharper disable once InconsistentNaming
+    // ReSharper disable once UnusedParameter.Local
     static void Main(string[] args)
     {
       var logger = NLog.LogManager.GetCurrentClassLogger();
@@ -24,6 +26,9 @@ namespace DRaumServerApp
       try
       {
         DRaumManager dRaumManager = new DRaumManager();
+        dRaumManager.initData();
+        dRaumManager.start();
+
         logger.Info("D-Raum-Server läuft");
         timer.Elapsed += Timer_Elapsed;
         timer.Start();
