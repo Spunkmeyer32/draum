@@ -11,13 +11,21 @@ namespace DRaumServerApp
   internal class AuthorManager
   {
     private static readonly NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
-    public static int Maxmanagedusers = 25;
+    public static int Maxmanagedusers = 100; // int.max
 
     [JsonProperty]
     private ConcurrentDictionary<long, Author> authors;    
 
     internal AuthorManager()
     {
+      if (Utilities.RUNNINGINTESTMODE)
+      {
+        Author.COOLDOWNMINUTES = 1;
+        Author.COOLDOWNMINUTESFLAGGING = 1;
+        Author.COOLDOWNHOURSPOSTING = 0;
+        Author.COOLDOWNHOURSFEEDBACK = 0;
+        AuthorManager.Maxmanagedusers = int.MaxValue;
+      }
       this.authors = new ConcurrentDictionary<long, Author>();
     }
 
@@ -40,6 +48,24 @@ namespace DRaumServerApp
         return this.authors[authorId];
       }
       return null;
+    }
+
+    internal bool canUserVote(long postingid, long authorId)
+    {
+      if (this.authors.ContainsKey(authorId))
+      {
+        return this.authors[authorId].canVote(postingid);
+      }
+      return false;
+    }
+
+    internal bool canUserFlag(long postingid, long authorId)
+    {
+      if (this.authors.ContainsKey(authorId))
+      {
+        return this.authors[authorId].canFlag(postingid);
+      }
+      return false;
     }
 
     private Author getAuthor(long authorId, string externalName) 
@@ -82,7 +108,7 @@ namespace DRaumServerApp
       int temp;
       foreach(Author author in this.authors.Values)
       {
-        temp = author.getUserLevel();
+        temp = author.getLevel();
         levellist.Add(temp);
         if(temp > toplevel)
         {
@@ -167,8 +193,25 @@ namespace DRaumServerApp
       {
         return "<i>Schreiber/in nicht gefunden!</i>\r\n<i>Verfasst im D-Raum https://t.me/d_raum </i>";
       }
-      return "<i>" + author.getUserInfo() + "</i>\r\n<i>Verfasst im D-Raum https://t.me/d_raum </i>";
+      return "<i>" + author.getShortAuthorInfo() + "</i>\r\n<i>Verfasst im D-Raum https://t.me/d_raum </i>";
     }
+
+    internal void vote(long postingId, long authorId)
+    {
+      if (this.authors.ContainsKey(authorId))
+      {
+        this.authors[authorId].vote(postingId);
+      }
+    }
+
+    internal void flag(long postingId, long authorId)
+    {
+      if (this.authors.ContainsKey(authorId))
+      {
+        this.authors[authorId].flag(postingId);
+      }
+    }
+
 
     internal void updateCredibility(long authorId, long receivedUpVotes, long receivedDownVotes)
     {

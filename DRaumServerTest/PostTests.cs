@@ -13,9 +13,10 @@ namespace DRaumServerTest
     public void postVotePercentageTest()
     {
       Posting posting = new Posting(10, "TestPost", 99);
-      posting.voteup(1, 10);
-      posting.voteup(2, 10);
-      posting.votedown(3, 5);
+      Assert.AreEqual(50, posting.getUpVotePercentage());  
+      posting.voteup(10);
+      posting.voteup(10);
+      posting.votedown(5);
       // 20 / 25 = 0,8 * 100 = 80 ceil = 80
       Assert.AreEqual(80, posting.getUpVotePercentage());      
     }
@@ -47,11 +48,11 @@ namespace DRaumServerTest
           {
             if(count > numposts/2)
             {
-              pmgr.downvote(pair.Key, 200 + i, 10);
+              pmgr.downvote(pair.Key, 200 + i);
             }
             else
             {
-              pmgr.upvote(pair.Key, 200 + i, 10);
+              pmgr.upvote(pair.Key, 200 + i);
             }            
           }
         }
@@ -82,11 +83,21 @@ namespace DRaumServerTest
     [TestMethod]
     public void postDoubleVoteDenyTest()
     {
-      Posting posting = new Posting(10, "TestPost", 99);
-      posting.voteup(10, 10);
-      Assert.IsFalse(posting.canUserVote(10));
-      posting.votedown(20, 10);
-      Assert.IsFalse(posting.canUserVote(20));
+      PostingManager pmgr = new PostingManager();
+      AuthorManager amgr = new AuthorManager();
+      Utilities.RUNNINGINTESTMODE = false;
+      amgr.setPostMode(10,"user1");
+      amgr.setPostMode(20, "user2");
+      pmgr.addPosting("testpost", 10);
+      KeyValuePair<long, string> kvp = pmgr.getNextPostToCheck();
+      long postingId = kvp.Key;
+      pmgr.acceptPost(postingId, PostingPublishManager.publishHourType.NORMAL);
+      Assert.IsFalse(pmgr.isAuthor(postingId,20));
+      Assert.IsTrue(amgr.canUserVote(postingId,20));
+      amgr.vote(postingId,20);
+      pmgr.upvote(postingId,5);
+      Assert.IsFalse( !pmgr.isAuthor(postingId,20) && amgr.canUserVote(postingId,20) );
+      Assert.IsFalse( !pmgr.isAuthor(postingId,10) && amgr.canUserVote(postingId,10) );
     }
 
     [TestMethod]
@@ -111,7 +122,7 @@ namespace DRaumServerTest
             }
             // Threads laufen bis hier hin, warten dann auf das Signal des letzten Threads
             startEvent.WaitOne();
-            this.processMTTest(i + 10, ref posting);
+            this.processMTTest(ref posting);
             if (Interlocked.Decrement(ref toProcess) == 0)
             { 
               resetEvent.Set();
@@ -127,10 +138,9 @@ namespace DRaumServerTest
       }      
     }
 
-    private void processMTTest(int userid, ref Posting posting)
+    private void processMTTest(ref Posting posting)
     {
-      posting.voteup(userid, 5);
-      Assert.AreEqual(false, posting.canUserVote(userid));
+      posting.voteup(5);
       Thread.Sleep(10);
       Assert.AreEqual(20, posting.getChatMessageID());
       Thread.Sleep(10);
@@ -141,7 +151,7 @@ namespace DRaumServerTest
       Thread.Sleep(10);
       posting.getUpVotePercentage();
       Thread.Sleep(10);
-      posting.flag(userid);
+      posting.flag();
       Assert.AreEqual(true, posting.isFlagged());
       Assert.AreEqual(true, posting.isDirty());
     }

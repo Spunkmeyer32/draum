@@ -5,7 +5,7 @@
     private readonly string callbackPrefix;
     private readonly long id;
 
-    internal DRaumCallbackData(string prefix, long id)
+    private DRaumCallbackData(string prefix, long id)
     {
       this.callbackPrefix = prefix;
       this.id = id;

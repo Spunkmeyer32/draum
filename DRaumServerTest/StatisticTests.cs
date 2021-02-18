@@ -14,14 +14,14 @@ namespace DRaumServerTest
       DRaumStatistics drs = new DRaumStatistics();
 
       drs.setVotesMedian(200);
-      Assert.AreEqual(true, drs.isTopPost(50, 200));
-      Assert.AreEqual(false, drs.isTopPost(49, 200));
-      Assert.AreEqual(false, drs.isTopPost(50, 199));
+      Assert.AreEqual(true, drs.isTopPost(100, 200));
+      Assert.AreEqual(false, drs.isTopPost(99, 200));
+      Assert.AreEqual(false, drs.isTopPost(100, 199));
       Assert.AreEqual(false, drs.isTopPost(0, 0));
-      Assert.AreEqual(true, drs.isTopPost(100, 23476238));
+      Assert.AreEqual(true, drs.isTopPost(23476238, 23476238));
       drs.setVotesMedian(500);
-      Assert.AreEqual(true, drs.isTopPost(50, 500));
-      Assert.AreEqual(false, drs.isTopPost(50, 499));
+      Assert.AreEqual(true, drs.isTopPost(250, 500));
+      Assert.AreEqual(false, drs.isTopPost(249, 499));
     }
 
     [TestMethod]

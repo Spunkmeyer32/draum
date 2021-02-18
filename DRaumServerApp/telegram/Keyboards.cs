@@ -127,14 +127,11 @@ namespace DRaumServerApp.telegram
     /// <summary>
     /// [ 👍 x% ] [ 👎 y% ] [ 🚩 Melden ]
     /// </summary>
-    /// <param name="upvotePercentage"></param>
-    /// <param name="postId"></param>
     /// <returns></returns>
-    internal static InlineKeyboardMarkup getPostKeyboard(int upvotePercentage, long postId)
+    internal static InlineKeyboardMarkup getPostKeyboard(long posvotes, long negvotes, long postId)
     {
-      int downvotePercentage = 100 - upvotePercentage;
-      InlineKeyboardButton thumbsUpButton = InlineKeyboardButton.WithCallbackData("👍 " + upvotePercentage + "%", DRaumManager.voteUpPrefix + postId);
-      InlineKeyboardButton thumbsDownButton = InlineKeyboardButton.WithCallbackData("👎 " + downvotePercentage + "%", DRaumManager.voteDownPrefix + postId);
+      InlineKeyboardButton thumbsUpButton = InlineKeyboardButton.WithCallbackData("👍 " + Utilities.getHumanAbbrevNumber(posvotes), DRaumManager.voteUpPrefix + postId);
+      InlineKeyboardButton thumbsDownButton = InlineKeyboardButton.WithCallbackData("👎 " + Utilities.getHumanAbbrevNumber(negvotes), DRaumManager.voteDownPrefix + postId);
       InlineKeyboardButton flagButton = InlineKeyboardButton.WithCallbackData("🚩 Melden", DRaumManager.flagPrefix + postId);
       List<InlineKeyboardButton> buttonlist = new List<InlineKeyboardButton>
       {

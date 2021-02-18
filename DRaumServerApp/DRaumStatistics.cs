@@ -1,5 +1,10 @@
-﻿using Newtonsoft.Json;
+﻿using Hardware.Info;
+using McpNetwork.SystemMetrics;
+using McpNetwork.SystemMetrics.Models;
+using Newtonsoft.Json;
 using System;
+using System.Text;
+
 
 namespace DRaumServerApp
 {
@@ -9,6 +14,9 @@ namespace DRaumServerApp
     private readonly object interactionMutex = new object();
 
     [JsonIgnore]
+    private static readonly HardwareInfo hardwareInfo = new HardwareInfo();
+
+    [JsonIgnore]
     private long currentIntervalInteractions;
     [JsonIgnore]
     private long lastIntervalInteractions;
@@ -16,12 +24,12 @@ namespace DRaumServerApp
     private long medianVotesPerPost;
     [JsonProperty]
     private volatile int medianWritersLevel;
-    [JsonProperty] 
+    [JsonProperty]
     private volatile int topWritersLevel;
 
-    internal DRaumStatistics() 
+    internal DRaumStatistics()
     {
-      this.medianVotesPerPost = 0;
+      this.medianVotesPerPost = 1;
       this.medianWritersLevel = 1;
       this.topWritersLevel = 1;
     }
@@ -34,7 +42,14 @@ namespace DRaumServerApp
 
     internal void setVotesMedian(long median)
     {
-      this.medianVotesPerPost = median;
+      if (median > 1)
+      {
+        this.medianVotesPerPost = median;
+      }
+      else
+      {
+        this.medianVotesPerPost = 1;
+      }
     }
 
     internal long getMedianVotesPerPost()
@@ -42,13 +57,13 @@ namespace DRaumServerApp
       return this.medianVotesPerPost;
     }
 
-    internal bool isTopPost(int positiveVotesPercentage, int votes)
+    internal bool isTopPost(long upVotes, long votes)
     {
       // Sollte schon der mittleren Aktivität entsprechen
-      if(votes >= this.medianVotesPerPost)
+      if (votes >= this.medianVotesPerPost)
       {
         // und eine positive Zustimmungsquote haben
-        if(positiveVotesPercentage >= 50)
+        if (upVotes >= votes / 2)
         {
           return true;
         }
@@ -56,7 +71,33 @@ namespace DRaumServerApp
       return false;
     }
 
-    /// TODO Statistiken über das Server-Programm (RAM-Nutzung, CPU-Last, Festplatte) ausgeben!
+    internal String getHardwareInfo()
+    {
+      hardwareInfo.RefreshMemoryStatus();
+      hardwareInfo.RefreshDriveList();
+      StringBuilder sb = new StringBuilder();
+      sb.Append((((double)hardwareInfo.MemoryStatus.AvailablePhysical / 1024.0) / 1024.0).ToString("0.00"));
+      sb.Append(" MB free physical mem\r\n");
+      foreach (var drive in hardwareInfo.DriveList)
+      {
+        foreach (var partition in drive.PartitionList)
+        {
+          foreach (var volume in partition.VolumeList)
+          {
+            sb.Append(volume.Name);
+            sb.Append(" has ");
+            sb.Append((((double)volume.FreeSpace / 1024.0) / 1024.0).ToString("0.0"));
+            sb.Append(" MB free space");
+            sb.Append("\r\n");
+          }
+        }
+      }
+      SystemMetrics systemMetrics = new SystemMetrics();
+      Metrics result = systemMetrics.GetMetrics();
+      sb.Append(result.TotalCpuUsage.ToString("0.0"));
+      sb.Append(" % CPU Usage");
+      return sb.ToString();
+    }
 
     internal int getPremiumLevelCap()
     {
@@ -65,7 +106,7 @@ namespace DRaumServerApp
 
     internal long getLastInteractionIntervalCount()
     {
-      lock(this.interactionMutex)
+      lock (this.interactionMutex)
       {
         return this.lastIntervalInteractions;
       }
@@ -73,7 +114,7 @@ namespace DRaumServerApp
 
     internal void switchInteractionInterval()
     {
-      lock(this.interactionMutex)
+      lock (this.interactionMutex)
       {
         this.lastIntervalInteractions = this.currentIntervalInteractions;
         this.currentIntervalInteractions = 0;
@@ -82,7 +123,7 @@ namespace DRaumServerApp
 
     internal void increaseInteraction()
     {
-      lock(this.interactionMutex)
+      lock (this.interactionMutex)
       {
         this.currentIntervalInteractions++;
       }

@@ -1,5 +1,7 @@
 ﻿using Newtonsoft.Json;
 using System;
+using System.Collections.Concurrent;
+using System.Linq;
 
 namespace DRaumServerApp
 {
@@ -8,10 +10,10 @@ namespace DRaumServerApp
 
     public enum InteractionCooldownTimer { NONE, DEFAULT, POSTING, FLAGGING, FEEDBACK };
 
-    private static int COOLDOWNMINUTES = 2;
-    private static int COOLDOWNMINUTESFLAGGING = 30; 
-    private static int COOLDOWNHOURSPOSTING = 3;
-    private static int COOLDOWNHOURSFEEDBACK = 1;
+    internal static int COOLDOWNMINUTES = 2;
+    internal static int COOLDOWNMINUTESFLAGGING = 30;
+    internal static int COOLDOWNHOURSPOSTING = 3;
+    internal static int COOLDOWNHOURSFEEDBACK = 1;
     private static int EXP_FOR_POSTING = 16;
     private static int EXP_FOR_VOTE = 7;
 
@@ -25,7 +27,7 @@ namespace DRaumServerApp
     private DateTime coolDownTimeStampFeedback;
 
     [JsonProperty]
-    private long authorID;
+    private long authorId;
     [JsonProperty]
     private string authorName;
     [JsonProperty]
@@ -44,6 +46,10 @@ namespace DRaumServerApp
     private long upvotesReceived;
     [JsonProperty]
     private long downvotesReceived;
+    [JsonProperty]
+    private ConcurrentBag<long> votedPosts;
+    [JsonProperty]
+    private ConcurrentBag<long> flaggedPosts;
 
     internal Author()
     {
@@ -53,23 +59,53 @@ namespace DRaumServerApp
     internal Author(long authorId, string authorName)
     {
       this.loadDefaults();
-      this.authorID = authorId;
+      this.authorId = authorId;
       this.authorName = authorName;     
     }
 
     private void loadDefaults()
     {
-      this.authorID = -1;
+      this.authorId = -1;
       this.authorName = "";
       this.postmode = false;
       this.feedbackmode = false;
       this.coolDownTimeStamp = DateTime.Now;
+      this.votedPosts = new ConcurrentBag<long>();
+      this.flaggedPosts = new ConcurrentBag<long>();
       this.votingGauge = 0;
       this.level = 1;
       this.exp = 0;
       this.postCount = 0;
       this.upvotesReceived = 0;
       this.downvotesReceived = 0;
+    }
+
+    internal bool canVote(long postId)
+    {
+      if (this.votedPosts.Contains(postId))
+      {
+        return false;
+      }
+      return true;
+    }
+
+    internal void vote(long postingId)
+    {
+      this.votedPosts.Add(postingId);
+    }
+
+    internal void flag(long postingId)
+    {
+      this.flaggedPosts.Add(postingId);
+    }
+
+    internal bool canFlag(long postId)
+    {
+      if (this.flaggedPosts.Contains(postId))
+      {
+        return false;
+      }         
+      return true;
     }
 
     internal PostingPublishManager.publishHourType getPublishType(int premiumLevelCap)
@@ -94,7 +130,7 @@ namespace DRaumServerApp
       this.upvotesReceived += receivedUpVotes;   
     }
 
-    public int getUserLevel()
+    public int getLevel()
     {
       if(this.level>=500)
       {
@@ -107,19 +143,19 @@ namespace DRaumServerApp
       return this.level;
     }
 
-    internal String getUserInfo()
+    internal string getShortAuthorInfo()
     {
       int percentage = 50;
       if(this.getTotalVotes() != 0)
       {
         percentage = (int)((this.upvotesReceived / (float)this.getTotalVotes()) * 100.0f);
       }
-      return "Level " + this.getUserLevel() + " Schreiber/in mit " + percentage + " Prozent  Zustimmung";
+      return "Level " + this.getLevel() + " Schreiber/in mit " + percentage + " Prozent  Zustimmung";
     }
 
-    internal String getFullUserInfo()
+    internal string getFullAuthorInfo()
     {
-      return "@"+this.authorName + " ("+this.authorID+")\r\n" + this.getUserInfo();
+      return "@"+this.authorName + " ("+this.authorId+")\r\n" + this.getShortAuthorInfo();
     }
 
     internal void publishedSuccessfully()
@@ -133,14 +169,14 @@ namespace DRaumServerApp
       return this.upvotesReceived + this.downvotesReceived;
     }
 
-    internal String getExternalUserName()
+    internal string getAuthorName()
     {
       return this.authorName;
     }
 
-    internal long getAuthorID()
+    internal long getAuthorId()
     {
-      return this.authorID;
+      return this.authorId;
     }
 
     internal void setPostMode()

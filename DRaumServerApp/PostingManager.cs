@@ -24,7 +24,11 @@ namespace DRaumServerApp
       {
         return 1;
       }
-      return ((Posting)y).getVoteCount() - ((Posting)x).getVoteCount();
+      if (((Posting)y).getVoteCount() < ((Posting)x).getVoteCount())
+      {
+        return -1;
+      }
+      return ((Posting)y).getVoteCount() > ((Posting)x).getVoteCount() ? 1 : 0;
     }
   }
 
@@ -54,6 +58,10 @@ namespace DRaumServerApp
 
     internal PostingManager()
     {
+      if (Utilities.RUNNINGINTESTMODE)
+      {
+        Posting.DAYSUNTILDELETENORMAL = 1;
+      }
       this.lastPostingId = 1;
       this.postings = new ConcurrentDictionary<long, Posting>();
       this.postingsToCheck = new ConcurrentQueue<Posting>();
@@ -64,9 +72,9 @@ namespace DRaumServerApp
       this.publishManager.calcNextSlot();
     }
 
-    internal void addPosting(string text, long authorID)
+    internal void addPosting(string text, long authorId)
     {
-      Posting posting = new Posting(this.lastPostingId++,text, authorID);
+      Posting posting = new Posting(this.lastPostingId++,text, authorId);
       this.postingsToCheck.Enqueue(posting);
       this.postsCheckChangeFlag = true;
     }
@@ -79,30 +87,21 @@ namespace DRaumServerApp
       switch (this.publishManager.getCurrentpublishType())
       {
         case PostingPublishManager.publishHourType.NORMAL:
-          if (this.postingsToPublish.Count > 0)
+          if (this.postingsToPublish.TryDequeue(out postId))
           {
-            if (this.postingsToPublish.TryDequeue(out postId))
-            {
-              postToPublish = this.postings[postId];
-            }
+            postToPublish = this.postings[postId];
           }
           break;
         case PostingPublishManager.publishHourType.HAPPY:
-          if (this.postingsToPublishHappyHour.Count > 0)
+          if (this.postingsToPublishHappyHour.TryDequeue(out postId))
           {
-            if (this.postingsToPublishHappyHour.TryDequeue(out postId))
-            {
-              postToPublish = this.postings[postId];
-            }
+            postToPublish = this.postings[postId];
           }
           break;
         case PostingPublishManager.publishHourType.PREMIUM:
-          if (this.postingsToPublishPremiumHour.Count > 0)
+          if (this.postingsToPublishPremiumHour.TryDequeue(out postId))
           {
-            if (this.postingsToPublishPremiumHour.TryDequeue(out postId))
-            {
-              postToPublish = this.postings[postId];
-            }
+            postToPublish = this.postings[postId];
           }
           break;
         default:
@@ -200,27 +199,27 @@ namespace DRaumServerApp
       return false;
     }
 
-    internal void resetDirtyFlag(long postingID)
+    internal void resetDirtyFlag(long postingId)
     {
-      if (this.postings.ContainsKey(postingID))
+      if (this.postings.ContainsKey(postingId))
       {
-        this.postings[postingID].resetDirtyFlag();
+        this.postings[postingId].resetDirtyFlag();
       }
     }
 
-    internal void resetTextDirtyFlag(long postingID)
+    internal void resetTextDirtyFlag(long postingId)
     {
-      if (this.postings.ContainsKey(postingID))
+      if (this.postings.ContainsKey(postingId))
       {
-        this.postings[postingID].resetTextDirtyFlag();
+        this.postings[postingId].resetTextDirtyFlag();
       }
     }
 
-    internal void resetFlagged(long postingID)
+    internal void resetFlagged(long postingId)
     {
-      if (this.postings.ContainsKey(postingID))
+      if (this.postings.ContainsKey(postingId))
       {
-        this.postings[postingID].resetFlagStatus();
+        this.postings[postingId].resetFlagStatus();
       }
     }
 
@@ -310,11 +309,11 @@ namespace DRaumServerApp
       return false;
     }
 
-    internal Posting removePostFromInCheck(long postID)
+    internal Posting removePostFromInCheck(long postId)
     {
-      if(!this.postingsInCheck.TryRemove(postID, out var posting))
+      if(!this.postingsInCheck.TryRemove(postId, out var posting))
       {
-        logger.Error("Konnte den Post nicht aus der Liste InCheck löschen: " + postID);
+        logger.Error("Konnte den Post nicht aus der Liste InCheck löschen: " + postId);
         return null;
       }
       return posting;
@@ -334,7 +333,7 @@ namespace DRaumServerApp
       return "... Post nicht gefunden ...";
     }
 
-    internal long getAuthorID(long postingId)
+    internal long getAuthorId(long postingId)
     {
       if(this.postings.ContainsKey(postingId))
       {
@@ -354,118 +353,118 @@ namespace DRaumServerApp
       return -1;
     }
 
-    internal void discardPost(long postingID)
+    internal void discardPost(long postingId)
     {
-      if (this.postingsInCheck.ContainsKey(postingID))
+      if (this.postingsInCheck.ContainsKey(postingId))
       {
         Posting posting = null;
-        this.postingsInCheck.TryRemove(postingID, out posting);
+        this.postingsInCheck.TryRemove(postingId, out posting);
         return;
       }
-      logger.Error("Konnte den Post mit der ID " + postingID + " nicht löschen.");
+      logger.Error("Konnte den Post mit der ID " + postingId + " nicht löschen.");
     }
 
-    internal bool canUserVote(long postingid, long id)
+    internal bool isAuthor(long postingId, long authorId)
     {
-      if (this.postings.ContainsKey(postingid))
+      if (this.postings.ContainsKey(postingId))
       {
-        return this.postings[postingid].canUserVote(id);
+        return this.postings[postingId].getAuthorID() == authorId;
       }
       return false;
     }
 
-    internal bool canUserFlag(long postingid, long id)
+    internal void upvote(long postingId, int votecount)
     {
-      if (this.postings.ContainsKey(postingid))
+      if (this.postings.ContainsKey(postingId))
       {
-        return this.postings[postingid].canUserFlag(id);
+        this.postings[postingId].voteup(votecount);
+      }
+    }
+
+    internal void downvote(long postingId, int votecount)
+    {
+      if (this.postings.ContainsKey(postingId))
+      {
+        this.postings[postingId].votedown(votecount);
+      }
+    }
+
+    internal void flag(long postingId)
+    {
+      if (this.postings.ContainsKey(postingId))
+      {
+        this.postings[postingId].flag();
+      }
+    }
+
+    internal int getMessageId(long postId)
+    {
+      if (this.postings.ContainsKey(postId))
+      {
+        return this.postings[postId].getChatMessageID();
+      }
+      return -1;
+    }
+
+    internal int getMessageIdDaily(long postId)
+    {
+      if (this.postings.ContainsKey(postId))
+      {
+        return this.postings[postId].getChatMessageDailyID();
+      }
+      return -1;
+    }
+
+    internal int getMessageIdWeekly(long postId)
+    {
+      if (this.postings.ContainsKey(postId))
+      {
+        return this.postings[postId].getChatMessageWeeklyID();
+      }
+      return -1;
+    }
+
+    internal bool isTopPost(long postId)
+    {
+      if (this.postings.ContainsKey(postId))
+      {
+        return this.postings[postId].getTopPostStatus();
       }
       return false;
     }
 
-    internal void upvote(long postingID, long id, int votecount)
+    internal long getUpVotes(long postId)
     {
-      if (this.postings.ContainsKey(postingID))
+      if (this.postings.ContainsKey(postId))
       {
-        this.postings[postingID].voteup(id, votecount);
+        return this.postings[postId].getUpVotes();
       }
+      return 0;
     }
 
-    internal void downvote(long postingID, long id, int votecount)
+    internal long getDownVotes(long postId)
     {
-      if (this.postings.ContainsKey(postingID))
+      if (this.postings.ContainsKey(postId))
       {
-        this.postings[postingID].votedown(id, votecount);
+        return this.postings[postId].getDownVotes();
       }
+      return 0;
     }
 
-    internal void flag(long postingID, long userID)
+    internal string getPostingText(long postingId)
     {
-      if (this.postings.ContainsKey(postingID))
+      if (this.postings.ContainsKey(postingId))
       {
-        this.postings[postingID].flag(userID);
-      }
-    }
-
-    internal int getMessageID(long postID)
-    {
-      if (this.postings.ContainsKey(postID))
-      {
-        return this.postings[postID].getChatMessageID();
-      }
-      return -1;
-    }
-
-    internal int getMessageIdDaily(long postID)
-    {
-      if (this.postings.ContainsKey(postID))
-      {
-        return this.postings[postID].getChatMessageDailyID();
-      }
-      return -1;
-    }
-
-    internal int getMessageIdWeekly(long postID)
-    {
-      if (this.postings.ContainsKey(postID))
-      {
-        return this.postings[postID].getChatMessageWeeklyID();
-      }
-      return -1;
-    }
-
-    internal bool isTopPost(long postID)
-    {
-      if (this.postings.ContainsKey(postID))
-      {
-        return this.postings[postID].getTopPostStatus();
-      }
-      return false;
-    }
-
-    internal int getUpVotePercentage(long postID)
-    {
-      if (this.postings.ContainsKey(postID))
-      {
-        return this.postings[postID].getUpVotePercentage();
-      }
-      return 50;
-    }
-
-    internal string getPostingText(long postingID)
-    {
-      if (this.postings.ContainsKey(postingID))
-      {
-        return this.postings[postingID].getPostingText();
+        return this.postings[postingId].getPostingText();
       }
       return "";
     }
 
-    internal string getPostingStatisticText(long postingID)
+    internal string getPostingStatisticText(long postingId)
     {
-      if (this.postings.ContainsKey(postingID))
+      if (this.postings.ContainsKey(postingId))
       {
-        return this.postings[postingID].getPostStatisticText();
+        return this.postings[postingId].getPostStatisticText();
       }
       return "";
     }
@@ -486,29 +485,29 @@ namespace DRaumServerApp
       }
     }
 
-    internal int getFlagCountOfPost(long postID)
+    internal int getFlagCountOfPost(long postId)
     {
-      if (this.postings.ContainsKey(postID))
+      if (this.postings.ContainsKey(postId))
       {
-        return this.postings[postID].getFlagCount();
+        return this.postings[postId].getFlagCount();
       }
       return -1;
     }
 
-    internal bool removePost(long postingID)
+    internal bool removePost(long postingId)
     {
-      if (this.postings.ContainsKey(postingID))
+      if (this.postings.ContainsKey(postingId))
       {
-        return this.postings.TryRemove(postingID, out var posting);
+        return this.postings.TryRemove(postingId, out var posting);
       }
       return false;
     }
 
-    internal bool removeFlagFromPost(long postingID)
+    internal bool removeFlagFromPost(long postingId)
     {
-      if (this.postings.ContainsKey(postingID))
+      if (this.postings.ContainsKey(postingId))
       {
-        this.postings[postingID].resetFlagStatus();
+        this.postings[postingId].resetFlagStatus();
         return true;
       }
       return false;
@@ -523,7 +522,7 @@ namespace DRaumServerApp
       }
       foreach (Posting posting in this.postings.Values)
       {
-        if (statistics.isTopPost(posting.getUpVotePercentage(), posting.getVoteCount()))
+        if (statistics.isTopPost(posting.getUpVotes(), posting.getVoteCount()))
         {
           posting.setTopPostStatus(true);
         }

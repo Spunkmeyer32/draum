@@ -17,7 +17,7 @@ namespace DRaumServerApp
     [JsonIgnore]
     private readonly object flagDataMutex = new object();
     [JsonIgnore]
-    private static readonly int DAYSUNTILDELETENORMAL = 1; // 76
+    internal static int DAYSUNTILDELETENORMAL = 76;
 
     [JsonIgnore]
     private readonly object upvoteMutex = new object();
@@ -52,10 +52,6 @@ namespace DRaumServerApp
     [JsonProperty]
     private volatile bool dirtyTextFlag; // Markiert den Post für ein Update im Chat
     [JsonProperty]
-    private ConcurrentBag<long> votedUsers;
-    [JsonProperty]
-    private ConcurrentBag<long> flaggedUsers;
-    [JsonProperty]
     private String postText;   
     [JsonProperty]
     private long upVotes;
@@ -89,8 +85,6 @@ namespace DRaumServerApp
       this.chatMessageWeeklyId = -1;
       this.postText = "";      
       this.flagged = false;
-      this.votedUsers = new ConcurrentBag<long>();
-      this.flaggedUsers = new ConcurrentBag<long>();
       this.flagCount = 0;
       this.upVotes = 0;
       this.downVotes = 0;      
@@ -109,9 +103,9 @@ namespace DRaumServerApp
       }
     }
 
-    internal int getVoteCount()
+    internal long getVoteCount()
     {
-      return this.votedUsers.Count;
+      return this.upVotes + this.downVotes;
     }
 
     internal long getPostID()
@@ -155,7 +149,7 @@ namespace DRaumServerApp
       }      
     }
 
-    internal void calculateDaysToDelete()
+    private void calculateDaysToDelete()
     {
       int newDays = 0;
       if(this.isTopPost)
@@ -171,6 +165,16 @@ namespace DRaumServerApp
         this.daysBeforeDelete = newDays;
         this.dirtyTextFlag = true;
       }
+    }
+
+    internal int getUpVotePercentage()
+    {
+      if (this.upVotes.Equals(0) && this.downVotes.Equals(0))
+      {
+        return 50;
+      }
+      float r = (float)this.upVotes / (float)(this.upVotes + this.downVotes);
+      return (int)(Math.Ceiling((r * 100.0f)));
     }
 
     internal string getPostStatisticText()
@@ -196,68 +200,36 @@ namespace DRaumServerApp
       return false;
     }
 
-    internal bool canUserVote(long id)
-    {
-      if(!Utilities.RUNNINGINTESTMODE)
-      { 
-        if (this.authorID == id)
-        {
-          return false;
-        }
-      }
-      if (this.votedUsers.Contains(id))
-      {
-        return false;
-      }
-      return true;
-    }
-
-    internal bool canUserFlag(long id)
-    {
-      if (!Utilities.RUNNINGINTESTMODE)
-      {
-        if (this.authorID == id)
-        {
-          return false;
-        }
-      }
-      if (this.flaggedUsers.Contains(id))
-      {
-        return false;
-      }         
-      return true;
-    }
+    
 
     internal void setTopPostStatus(bool status)
     {
       if (this.isTopPost != status)
       {
         this.isTopPost = status;
-        calculateDaysToDelete();
+        this.calculateDaysToDelete();
         this.dirtyTextFlag = true;
       }
     }
 
-    internal void voteup(long userID, int votecount)
+    internal void voteup(int votecount)
     {
       lock (this.upvoteMutex)
       {
         this.upVotes = this.upVotes + votecount;
-        calculateDaysToDelete();
+        this.calculateDaysToDelete();
         this.dirtyFlag = true;
-      }      
-      this.votedUsers.Add(userID);
+      }     
     }
 
-    internal void votedown(long userID, int votecount)
+    internal void votedown(int votecount)
     {
       lock (this.downvoteMutex)
       {
         this.downVotes = this.downVotes + votecount;
-        calculateDaysToDelete();
+        this.calculateDaysToDelete();
         this.dirtyFlag = true;
       }
-      this.votedUsers.Add(userID);
     }
 
     internal bool isDirty()
@@ -280,14 +252,13 @@ namespace DRaumServerApp
       this.dirtyTextFlag = false;
     }
 
-    internal void flag(long userID)
+    internal void flag()
     {
       lock (this.flagDataMutex)
       {
         this.flagCount = this.flagCount + 1;
         this.flagged = true;
       }      
-      this.flaggedUsers.Add(userID);
     }
 
     internal int getFlagCount()
@@ -311,14 +282,14 @@ namespace DRaumServerApp
       }
     }
 
-    internal int getUpVotePercentage()
+    public long getUpVotes()
     {
-      if(this.upVotes.Equals(0) && this.downVotes.Equals(0))
-      {
-        return 50;
-      }
-      float r = (float)this.upVotes / (float)(this.upVotes + this.downVotes);
-      return (int)(Math.Ceiling((r * 100.0f)));
+      return this.upVotes;
+    }
+
+    public long getDownVotes()
+    {
+      return this.downVotes;
     }
 
     internal void setChatMessageID(int messageId)
@@ -355,5 +326,7 @@ namespace DRaumServerApp
     {
       return this.isTopPost;
     }
+
+    
   }
 }
