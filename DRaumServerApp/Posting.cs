@@ -147,6 +147,21 @@ namespace DRaumServerApp
       }      
     }
 
+    internal void updateText(string text, bool dontSetDirtyFlag)
+    {
+      lock (this.textMutex)
+      {
+        if (!text.Equals(this.postText))
+        {
+          this.postText = text;
+          if (!dontSetDirtyFlag)
+          {
+            this.dirtyTextFlag = true;
+          }
+        }
+      }      
+    }
+
     private void calculateDaysToDelete()
     {
       int newDays = 0;
