@@ -1210,10 +1210,17 @@ namespace DRaumServerApp
         DRaumCallbackData callbackData = DRaumCallbackData.parseCallbackData(e.CallbackQuery.Data);
         if (callbackData.getPrefix().Equals(genericMessageDeletePrefix))
         {
-          await this.telegramModerateBot.DeleteMessageAsync(
-            chatId: this.adminChatId,
-            e.CallbackQuery.Message.MessageId);
-          return;
+          try
+          {
+            await this.telegramAdminBot.DeleteMessageAsync(
+              chatId: this.adminChatId,
+              messageId: e.CallbackQuery.Message.MessageId);
+            return;
+          }
+          catch (Exception ex)
+          {
+            logger.Error(ex, "Fehler beim löschen einer Nachricht im Admin-Chat(callback)");
+          }
         }
         if(callbackData.getPrefix().Equals(modDeletePrefix))
         {
@@ -1373,7 +1380,8 @@ namespace DRaumServerApp
         {
           await this.telegramModerateBot.DeleteMessageAsync(
             chatId: this.moderateChatId,
-            e.CallbackQuery.Message.MessageId);
+            messageId: e.CallbackQuery.Message.MessageId);
+          return;
         }
         if(callbackData.getPrefix().Equals(modGetNextCheckPostPrefix))
         {
@@ -1577,6 +1585,7 @@ namespace DRaumServerApp
           if(this.acceptPostForPublishing(callbackData.getId()).Result)
           {
             await this.inputBot.sendMessage(e.CallbackQuery.From.Id, "Der Beitrag ist angenommen");
+            this.inputBot.removeMessage(e.CallbackQuery.Message.MessageId, e.CallbackQuery.From.Id);
           }
           else
           {
@@ -1587,6 +1596,8 @@ namespace DRaumServerApp
         }
         if (callbackData.getPrefix().Equals(modBlockPrefix))
         {
+          this.posts.deletePost(callbackData.getId());
+          this.inputBot.removeMessage(e.CallbackQuery.Message.MessageId, e.CallbackQuery.From.Id);
           await this.inputBot.sendMessage(e.CallbackQuery.From.Id, "Der Post wird nicht veröffentlicht und verworfen.");
           return;
         }

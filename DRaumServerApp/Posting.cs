@@ -18,7 +18,6 @@ namespace DRaumServerApp
     private readonly object flagDataMutex = new object();
     [JsonIgnore]
     internal static int DAYSUNTILDELETENORMAL = 76;
-
     [JsonIgnore]
     private readonly object upvoteMutex = new object();
     [JsonIgnore]
@@ -32,7 +31,6 @@ namespace DRaumServerApp
     private readonly long authorID;
     [JsonProperty]
     private readonly DateTime submitTimestamp;
-
     [JsonProperty]
     private volatile int chatMessageId;
     [JsonProperty]
@@ -192,6 +190,10 @@ namespace DRaumServerApp
     {
       lock (this.publishTimestampMutex)
       {
+        if (this.publishTimestamp.Year <= 2000 || this.chatMessageId == -1)
+        {
+          return false;
+        }
         if (this.publishTimestamp.AddDays(this.daysBeforeDelete) < DateTime.Now)
         {
           return true;

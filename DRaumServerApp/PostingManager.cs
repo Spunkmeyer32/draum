@@ -60,7 +60,7 @@ namespace DRaumServerApp
     {
       if (Utilities.RUNNINGINTESTMODE)
       {
-        Posting.DAYSUNTILDELETENORMAL = 1;
+        Posting.DAYSUNTILDELETENORMAL = 2;
       }
       this.lastPostingId = 1;
       this.postings = new ConcurrentDictionary<long, Posting>();
@@ -84,29 +84,38 @@ namespace DRaumServerApp
       // Welche Stunde haben wir?
       Posting postToPublish = null;
       long postId = 0;
-      switch (this.publishManager.getCurrentpublishType())
+      try
       {
-        case PostingPublishManager.publishHourType.NORMAL:
-          if (this.postingsToPublish.TryDequeue(out postId))
-          {
-            postToPublish = this.postings[postId];
-          }
-          break;
-        case PostingPublishManager.publishHourType.HAPPY:
-          if (this.postingsToPublishHappyHour.TryDequeue(out postId))
-          {
-            postToPublish = this.postings[postId];
-          }
-          break;
-        case PostingPublishManager.publishHourType.PREMIUM:
-          if (this.postingsToPublishPremiumHour.TryDequeue(out postId))
-          {
-            postToPublish = this.postings[postId];
-          }
-          break;
-        default:
-          break;
+        switch (this.publishManager.getCurrentpublishType())
+        {
+          case PostingPublishManager.publishHourType.NORMAL:
+            if (this.postingsToPublish.TryDequeue(out postId))
+            {
+              postToPublish = this.postings[postId];
+            }
+            break;
+          case PostingPublishManager.publishHourType.HAPPY:
+            if (this.postingsToPublishHappyHour.TryDequeue(out postId))
+            {
+              postToPublish = this.postings[postId];
+            }
+            break;
+          case PostingPublishManager.publishHourType.PREMIUM:
+            if (this.postingsToPublishPremiumHour.TryDequeue(out postId))
+            {
+              postToPublish = this.postings[postId];
+            }
+            break;
+          default:
+            break;
+        }
       }
+      catch (Exception ex)
+      {
+        logger.Error(ex,"Posting konnte nicht veröffentlicht werden, postId war: " + postId);
+        postToPublish = null;
+      }
+
       if(postToPublish != null)
       {
         postToPublish.setPublishTimestamp(new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day, DateTime.Now.Hour, DateTime.Now.Minute, 0));

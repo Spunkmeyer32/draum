@@ -77,7 +77,7 @@ namespace DRaumServerApp
       hardwareInfo.RefreshDriveList();
       StringBuilder sb = new StringBuilder();
       sb.Append((((double)hardwareInfo.MemoryStatus.AvailablePhysical / 1024.0) / 1024.0).ToString("0.00"));
-      sb.Append(" MB free physical mem\r\n");
+      sb.Append(" MB freier RAM\r\n");
       foreach (var drive in hardwareInfo.DriveList)
       {
         foreach (var partition in drive.PartitionList)
@@ -85,9 +85,9 @@ namespace DRaumServerApp
           foreach (var volume in partition.VolumeList)
           {
             sb.Append(volume.Name);
-            sb.Append(" has ");
+            sb.Append(" hat ");
             sb.Append((((double)volume.FreeSpace / 1024.0) / 1024.0).ToString("0.0"));
-            sb.Append(" MB free space");
+            sb.Append(" MB freien Platz");
             sb.Append("\r\n");
           }
         }
@@ -95,7 +95,7 @@ namespace DRaumServerApp
       SystemMetrics systemMetrics = new SystemMetrics();
       Metrics result = systemMetrics.GetMetrics();
       sb.Append(result.TotalCpuUsage.ToString("0.0"));
-      sb.Append(" % CPU Usage");
+      sb.Append(" % CPU-Last");
       return sb.ToString();
     }
 

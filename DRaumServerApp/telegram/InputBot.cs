@@ -24,6 +24,21 @@ namespace DRaumServerApp.telegram
       this.feedbackManager = feedbackManager;
     }
 
+    internal async void removeMessage(int messageId, long authorId)
+    {
+      try
+      {
+        await this.telegramInputBot.DeleteMessageAsync(
+          messageId: messageId,
+          chatId: authorId
+        );
+      }
+      catch (Exception ex)
+      {
+        logger.Error(ex, "Fehler beim löschen einer Nachricht an den Autor " + authorId + " Msg-ID: " + messageId);
+      }
+    }
+
     internal async Task sendMessage(long authorId, string message)
     {
       try
@@ -201,6 +216,7 @@ namespace DRaumServerApp.telegram
         logger.Error(ex, "Fehler beim Text-Verarbeiten");
       }
     }
+
     
   }
 }
