@@ -24,7 +24,7 @@ namespace DRaumServerApp.telegram
       this.feedbackManager = feedbackManager;
     }
 
-    internal async void removeMessage(int messageId, long authorId)
+    internal async Task removeMessage(int messageId, long authorId)
     {
       try
       {
@@ -204,12 +204,6 @@ namespace DRaumServerApp.telegram
           );
           return;
         }
-        // Kein Modus
-        await this.telegramInputBot.SendTextMessageAsync(
-          chatId: chatid,
-          text: DRaumManager.noModeChosen,
-          replyMarkup: Keyboards.getChooseInputModeKeyboard()
-        );
       }
       catch(Exception ex)
       {

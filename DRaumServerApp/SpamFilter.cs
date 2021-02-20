@@ -88,8 +88,8 @@ namespace DRaumServerApp
       {
         message = "OK, es wurden Wörter ersetzt";
       }
-
-      input = input.Replace("<", "&lt;").Replace(">", "&gt;").Replace("&", "&amp;").Replace("\"", "&quot;");
+      
+      
 
       output = new string(input);      
       return true;

@@ -83,6 +83,7 @@ namespace DRaumServerApp
     private TelegramBotClient telegramAdminBot;
 
     private InputBot inputBot;
+    private AdminBot adminBot;
 
     // Chats (mit dem Admin, Moderator, Feedback und zur Veröffentlichung in Kanälen)
     private readonly long feedbackChatId;
@@ -122,7 +123,7 @@ namespace DRaumServerApp
     internal static readonly string modEditPrefix = "M";
     internal static readonly string modBlockPrefix = "N";
     internal static readonly string modGetNextCheckPostPrefix = "G";
-    internal static readonly string modDeletePrefix = "R";
+    internal static readonly string modDeleteFlaggedPrefix = "R";
     internal static readonly string modClearFlagPrefix = "C";
     internal static readonly string modeWritePrefix = "W";
     internal static readonly string modeFeedbackPrefix = "B";
@@ -226,6 +227,7 @@ namespace DRaumServerApp
       Task<Update[]> taskFeedback = this.telegramFeedbackBot.GetUpdatesAsync();
 
       this.inputBot = new InputBot(this.authors, this.statistics, this.telegramInputBot, this.posts, this.feedbackManager);
+      this.adminBot = new AdminBot(this.authors, this.statistics, this.telegramInputBot, this.posts, this.feedbackManager);
 
       logger.Info("Setze das Offset bei den Nachrichten, um nicht erhaltene Updates zu löschen");
       Update[] updates = taskInput.Result;
@@ -539,17 +541,15 @@ namespace DRaumServerApp
         {
           // getText and send to Admin
           string msgText = "Dieser Post wurde " + this.posts.getFlagCountOfPost(postId) + "-Mal geflaggt!!! \r\n" + this.posts.getPostingText(postId);
-          try
+          Message msg = await this.adminBot.sendMessageWithKeyboard(this.adminChatId, msgText,
+            Keyboards.getFlaggedPostModKeyboard(postId));
+          if (msg == null)
           {
-            Message msg = this.telegramAdminBot.SendTextMessageAsync(
-              chatId: this.adminChatId,
-              text: msgText,
-              replyMarkup: Keyboards.getFlaggedPostModKeyboard(postId)).Result;
-            this.flaggedPostsSent.Add(postId);
+            logger.Error("Beim senden eines geflaggten Beitrags trat ein Fehler auf.");
           }
-          catch (Exception ex)
+          else
           {
-            logger.Error(ex, "Beim senden eines geflaggten Beitrags trat ein Fehler auf.");
+            this.flaggedPostsSent.Add(postId);
           }
         }
         else
@@ -823,9 +823,7 @@ namespace DRaumServerApp
       catch (Exception e)
       {
         logger.Error(e, "(Exception)Fehler beim Publizieren des Posts: " + postID);
-        await this.telegramAdminBot.SendTextMessageAsync(
-          chatId: this.adminChatId,
-          text: "Fehler beim Publizieren des Posts: " + postID);
+        await this.adminBot.sendMessage(this.adminChatId, "Fehler beim Publizieren des Posts: " + postID);
         fail = true;
       }
       if (fail)
@@ -1019,32 +1017,20 @@ namespace DRaumServerApp
         int msgId = this.feedbackManager.getAdminStatisticMessageID();
         if (msgId == -1)
         {
-          try
-          {
-            Message msg = this.telegramAdminBot.SendTextMessageAsync(
-              chatId: this.adminChatId,
-              text: this.adminStatisticText).Result;
-            this.feedbackManager.setAdminStatisticMessageID(msg.MessageId);
-          }
-          catch (Exception ex)
+          Message msg = await this.adminBot.sendMessage(this.adminChatId, this.adminStatisticText);
+          if (msg == null)
           {
             this.feedbackManager.setAdminStatisticMessageID(-1);
-            logger.Error(ex,"Fehler beim Senden der Statistiknachricht an den Admin");
+            logger.Error("Fehler beim Senden der Statistiknachricht an den Admin");
+          }
+          else
+          {
+            this.feedbackManager.setAdminStatisticMessageID(msg.MessageId);
           }
         }
         else
         {
-          try
-          {
-            await this.telegramAdminBot.EditMessageTextAsync(
-              chatId: this.adminChatId,
-              messageId: msgId,
-              text: this.adminStatisticText);
-          }
-          catch (Exception ex)
-          {
-            logger.Error(ex, "Fehler beim Ändern der Statistik-Nachricht an den Admin");
-          }
+          await this.adminBot.editMessage(this.adminChatId, msgId, this.adminStatisticText);
         }
       }
     }
@@ -1183,19 +1169,9 @@ namespace DRaumServerApp
       }
       else
       {
-        try
-        {
-          await this.telegramAdminBot.SendTextMessageAsync(
-            chatId: this.adminChatId,
-            text: "Der Post " + postingID +
-                  " konnte nicht in die Liste zu veröffentlichender Posts eingefügt werden, FEHLER!",
-            replyMarkup: Keyboards.getGotItDeleteButtonKeyboard()
-          );
-        }
-        catch (Exception ex)
-        {
-          logger.Error(ex, "Fehler beim Benachrichtigen des Admins über einen Fehler bei Post " + postingID);
-        }
+        await this.adminBot.sendMessageWithKeyboard(this.adminChatId, 
+          "Der Post " + postingID + " konnte nicht in die Liste zu veröffentlichender Posts eingefügt werden, FEHLER!",
+          Keyboards.getGotItDeleteButtonKeyboard());
         return false;
       }
       return true;
@@ -1239,19 +1215,10 @@ namespace DRaumServerApp
         DRaumCallbackData callbackData = DRaumCallbackData.parseCallbackData(e.CallbackQuery.Data);
         if (callbackData.getPrefix().Equals(genericMessageDeletePrefix))
         {
-          try
-          {
-            await this.telegramAdminBot.DeleteMessageAsync(
-              chatId: this.adminChatId,
-              messageId: e.CallbackQuery.Message.MessageId);
-            return;
-          }
-          catch (Exception ex)
-          {
-            logger.Error(ex, "Fehler beim löschen einer Nachricht im Admin-Chat(callback)");
-          }
+          await this.adminBot.removeMessage(e.CallbackQuery.Message.MessageId, this.adminChatId);
+          return;
         }
-        if(callbackData.getPrefix().Equals(modDeletePrefix))
+        if(callbackData.getPrefix().Equals(modDeleteFlaggedPrefix))
         {
           // Der Admin entscheided den geflaggten Post zu entfernen
           int messageId = this.posts.getMessageId(callbackData.getId());
@@ -1262,7 +1229,7 @@ namespace DRaumServerApp
           {
             if (!this.posts.removePost(callbackData.getId()))
             {
-              logger.Error("Konnte den Post nicht aus dem Datensatz löschen");
+              logger.Error("Konnte den Post "+callbackData.getId()+" nicht aus dem Datensatz löschen");
               resultText = "Konnte nicht aus dem Datensatz gelöscht werden.";
             }
             try
@@ -1297,25 +1264,10 @@ namespace DRaumServerApp
             logger.Error("Es konnte keine Message-ID gefunden werden (im Chat) um den Beitrag zu löschen : " + callbackData.getId());
             resultText = "Der Post scheint gar nicht veröffentlicht zu sein";
           }
-
-          try
-          {
-            // Nachricht aus dem Admin-Chat löschen
-            await this.telegramAdminBot.DeleteMessageAsync(
-              chatId: this.adminChatId,
-              messageId: e.CallbackQuery.Message.MessageId
-            );
-            // Rückmeldung an Admin
-            await this.telegramAdminBot.SendTextMessageAsync(
-              chatId: this.adminChatId,
-              text: resultText,
-              replyMarkup: Keyboards.getGotItDeleteButtonKeyboard());
-          }
-          catch (Exception ex)
-          {
-            logger.Error(ex, "Fehler bei Rückmeldung an den Admin (Geflaggten Post löschen)");
-          }
-
+          // Nachricht aus dem Admin-Chat löschen
+          await this.adminBot.removeMessage(e.CallbackQuery.Message.MessageId, this.adminChatId);
+          // Rückmeldung an Admin
+          await this.adminBot.sendMessageWithKeyboard(this.adminChatId, resultText, Keyboards.getGotItDeleteButtonKeyboard());
           return;
         }
         if(callbackData.getPrefix().Equals(modClearFlagPrefix))
@@ -1323,14 +1275,8 @@ namespace DRaumServerApp
           // Der Admin entscheided, den Flag zurückzunehmen
           if (this.posts.removeFlagFromPost(callbackData.getId()))
           {
-            await this.telegramAdminBot.DeleteMessageAsync(
-              chatId: this.adminChatId,
-              messageId: e.CallbackQuery.Message.MessageId
-            );
-            await this.telegramAdminBot.AnswerCallbackQueryAsync(
-              callbackQueryId: e.CallbackQuery.Id,
-              text: "Flag wurde entfernt",
-              showAlert: true);
+            await this.adminBot.removeMessage(e.CallbackQuery.Message.MessageId, this.adminChatId);
+            await this.adminBot.replyToCallback(e.CallbackQuery.Id, "Flag wurde entfernt");
           }
           else
           {
@@ -1422,6 +1368,7 @@ namespace DRaumServerApp
               Message msg = this.telegramModerateBot.SendTextMessageAsync(
                 chatId: this.moderateChatId,
                 text: postingPair.Value,
+                parseMode: ParseMode.Html,
                 replyMarkup: Keyboards.getModeratePostKeyboard(postingPair.Key)
               ).Result;
             }
@@ -1570,7 +1517,7 @@ namespace DRaumServerApp
           if(this.acceptPostForPublishing(callbackData.getId()).Result)
           {
             await this.inputBot.sendMessage(e.CallbackQuery.From.Id, "Der Beitrag ist angenommen");
-            this.inputBot.removeMessage(e.CallbackQuery.Message.MessageId, e.CallbackQuery.From.Id);
+            await this.inputBot.removeMessage(e.CallbackQuery.Message.MessageId, e.CallbackQuery.From.Id);
           }
           else
           {
@@ -1582,7 +1529,7 @@ namespace DRaumServerApp
         if (callbackData.getPrefix().Equals(modBlockPrefix))
         {
           this.posts.deletePost(callbackData.getId());
-          this.inputBot.removeMessage(e.CallbackQuery.Message.MessageId, e.CallbackQuery.From.Id);
+          await this.inputBot.removeMessage(e.CallbackQuery.Message.MessageId, e.CallbackQuery.From.Id);
           await this.inputBot.sendMessage(e.CallbackQuery.From.Id, "Der Post wird nicht veröffentlicht und verworfen.");
           return;
         }
@@ -1639,7 +1586,17 @@ namespace DRaumServerApp
           await this.inputBot.switchToFeedbackMode(e.Message.From.Id, e.Message.From.Username, e.Message.Chat.Id);
           return;
         }
-        await this.inputBot.processTextInput(e.Message.From.Id, e.Message.From.Username, e.Message.Chat.Id, e.Message.Text);
+        if (this.authors.isFeedbackMode(e.Message.From.Id, e.Message.From.Username) ||
+            this.authors.isPostMode(e.Message.From.Id, e.Message.From.Username))
+        {
+          string text = Utilities.telegramEntitiesToHtml(e.Message.Text, e.Message.Entities);
+          await this.inputBot.processTextInput(e.Message.From.Id, e.Message.From.Username, e.Message.Chat.Id, text);
+        }
+        else
+        {
+          // Kein Modus
+          await this.inputBot.sendMessageWithKeyboard(e.Message.From.Id, noModeChosen, Keyboards.getChooseInputModeKeyboard());
+        }
       }
     }
 
@@ -1670,7 +1627,7 @@ namespace DRaumServerApp
           Posting posting = this.posts.getPostingInCheck(this.feedbackManager.getNextModeratedPostID());          
           if (posting != null)
           {
-            posting.updateText(e.Message.Text,true);
+            posting.updateText(e.Message.Text, true);
             await this.inputBot.sendMessageWithKeyboard(posting.getAuthorID(), "MODERIERTER TEXT:\r\n\r\n"+posting.getPostingText(),
               Keyboards.getAcceptDeclineModeratedPostKeyboard(posting.getPostID()));
             this.feedbackManager.resetProcessModerationText();

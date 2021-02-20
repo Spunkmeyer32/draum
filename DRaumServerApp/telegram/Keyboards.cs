@@ -61,7 +61,7 @@ namespace DRaumServerApp.telegram
     /// <returns></returns>
     internal static InlineKeyboardMarkup getFlaggedPostModKeyboard(long postId)
     {
-      InlineKeyboardButton deleteButton = InlineKeyboardButton.WithCallbackData("Beitrag löschen", DRaumManager.modDeletePrefix + postId);
+      InlineKeyboardButton deleteButton = InlineKeyboardButton.WithCallbackData("Beitrag löschen", DRaumManager.modDeleteFlaggedPrefix + postId);
       InlineKeyboardButton clearFlagButton = InlineKeyboardButton.WithCallbackData("Flag entfernen", DRaumManager.modClearFlagPrefix + postId);
       List<InlineKeyboardButton> buttonlist = new List<InlineKeyboardButton>
       {
