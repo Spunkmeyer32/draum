@@ -52,14 +52,10 @@ Selbst veröffentlichen, Feedback geben und weiteres kann man mit dem Eingabe-Bo
 
 namespace DRaumServerApp
 {
-  public class FileDateComparer : IComparer
-  {
-    public int Compare(object x, object y)
-    {
-      return ((FileInfo)x).LastWriteTime.CompareTo(((FileInfo)y).LastWriteTime);
-    }
-  }
-
+  
+  /// <summary>
+  /// Hauptklasse für den D-Raum Telegram-Bot-Server
+  /// </summary>
   internal class DRaumManager
   {
     #region dynamicmembers
@@ -119,18 +115,7 @@ namespace DRaumServerApp
     private const string Writecommand = "schreiben";
     private const string Feedbackcommand = "nachricht";
 
-    internal static readonly string modAcceptPrefix = "Y";
-    internal static readonly string modEditPrefix = "M";
-    internal static readonly string modBlockPrefix = "N";
-    internal static readonly string modGetNextCheckPostPrefix = "G";
-    internal static readonly string modDeleteFlaggedPrefix = "R";
-    internal static readonly string modClearFlagPrefix = "C";
-    internal static readonly string modeWritePrefix = "W";
-    internal static readonly string modeFeedbackPrefix = "B";
-    internal static readonly string genericMessageDeletePrefix = "X";
-    internal static readonly string voteUpPrefix = "U";
-    internal static readonly string voteDownPrefix = "D";
-    internal static readonly string flagPrefix = "F";
+
 
     private static readonly Telegram.Bot.Types.Enums.UpdateType[] receivefilterCallbackAndMessage = { Telegram.Bot.Types.Enums.UpdateType.CallbackQuery, Telegram.Bot.Types.Enums.UpdateType.Message };
     private static readonly Telegram.Bot.Types.Enums.UpdateType[] receivefilterCallbackOnly = { Telegram.Bot.Types.Enums.UpdateType.CallbackQuery, Telegram.Bot.Types.Enums.UpdateType.Message };
@@ -209,7 +194,7 @@ namespace DRaumServerApp
       this.startupinfo += "\r\nMaximale Autorenzahl:" + AuthorManager.Maxmanagedusers;
     }
 
-    internal void start()
+    internal async void start()
     {
       this.telegramInputBot = new TelegramBotClient(ConfigurationManager.AppSettings["telegramInputToken"]);
       this.telegramPublishBot = new TelegramBotClient(ConfigurationManager.AppSettings["telegramPublishToken"]);
@@ -217,38 +202,36 @@ namespace DRaumServerApp
       this.telegramModerateBot = new TelegramBotClient(ConfigurationManager.AppSettings["telegramModerateToken"]);
       this.telegramAdminBot = new TelegramBotClient(ConfigurationManager.AppSettings["telegramAdminToken"]);
 
-      this.telegramAdminBot.SendTextMessageAsync(chatId: this.adminChatId, text: this.startupinfo +"\r\n"
-        + this.statistics.getHardwareInfo());
-
-
       Task<Update[]> taskInput = this.telegramInputBot.GetUpdatesAsync();
       Task<Update[]> taskModerate = this.telegramModerateBot.GetUpdatesAsync();
       Task<Update[]> taskPublish = this.telegramPublishBot.GetUpdatesAsync();
       Task<Update[]> taskFeedback = this.telegramFeedbackBot.GetUpdatesAsync();
 
       this.inputBot = new InputBot(this.authors, this.statistics, this.telegramInputBot, this.posts, this.feedbackManager);
-      this.adminBot = new AdminBot(this.authors, this.statistics, this.telegramInputBot, this.posts, this.feedbackManager);
+      this.adminBot = new AdminBot(this.telegramAdminBot);
+
+      await this.adminBot.sendMessage(this.adminChatId,this.startupinfo +"\r\n" + this.statistics.getHardwareInfo());
 
       logger.Info("Setze das Offset bei den Nachrichten, um nicht erhaltene Updates zu löschen");
       Update[] updates = taskInput.Result;
       if (updates.Length > 0)
       {
-        this.telegramInputBot.MessageOffset = updates[updates.Length - 1].Id + 1;
+        this.telegramInputBot.MessageOffset = updates[^1].Id + 1;
       }
       updates = taskModerate.Result;
       if (updates.Length > 0)
       {
-        this.telegramModerateBot.MessageOffset = updates[updates.Length - 1].Id + 1;
+        this.telegramModerateBot.MessageOffset = updates[^1].Id + 1;
       }
       updates = taskPublish.Result;
       if (updates.Length > 0)
       {
-        this.telegramPublishBot.MessageOffset = updates[updates.Length - 1].Id + 1;
+        this.telegramPublishBot.MessageOffset = updates[^1].Id + 1;
       }
       updates = taskFeedback.Result;
       if (updates.Length > 0)
       {
-        this.telegramFeedbackBot.MessageOffset = updates[updates.Length - 1].Id + 1;
+        this.telegramFeedbackBot.MessageOffset = updates[^1].Id + 1;
       }
 
       logger.Info("Beginne das Lauschen auf eingehende Nachrichten...");
@@ -992,7 +975,8 @@ namespace DRaumServerApp
       this.telegramModerateBot.StopReceiving();
       this.telegramPublishBot.StopReceiving();
       this.telegramFeedbackBot.StopReceiving();
-      this.telegramAdminBot.SendTextMessageAsync(chatId: this.adminChatId, text: "Server ist beendet!").Wait();
+
+      await this.adminBot.sendMessage(this.adminChatId, "Server ist beendet!");
       await this.backupData();
     }
 
@@ -1185,7 +1169,7 @@ namespace DRaumServerApp
       if (e.CallbackQuery.Data != null)
       {
         DRaumCallbackData callbackData = DRaumCallbackData.parseCallbackData(e.CallbackQuery.Data);
-        if (callbackData.getPrefix().Equals(modBlockPrefix))
+        if (callbackData.getPrefix().Equals(Keyboards.ModBlockPrefix))
         {
           // verwerfen des feedbacks
           await this.telegramFeedbackBot.EditMessageReplyMarkupAsync(
@@ -1195,7 +1179,7 @@ namespace DRaumServerApp
           );
           return;
         }
-        if(callbackData.getPrefix().Equals(modAcceptPrefix))
+        if(callbackData.getPrefix().Equals(Keyboards.ModAcceptPrefix))
         {
           // Antworten auf das Feedback
           this.feedbackManager.enableWaitForFeedbackReply(callbackData.getId());
@@ -1213,12 +1197,12 @@ namespace DRaumServerApp
       if(e.CallbackQuery.Data != null)
       {
         DRaumCallbackData callbackData = DRaumCallbackData.parseCallbackData(e.CallbackQuery.Data);
-        if (callbackData.getPrefix().Equals(genericMessageDeletePrefix))
+        if (callbackData.getPrefix().Equals(Keyboards.GenericMessageDeletePrefix))
         {
           await this.adminBot.removeMessage(e.CallbackQuery.Message.MessageId, this.adminChatId);
           return;
         }
-        if(callbackData.getPrefix().Equals(modDeleteFlaggedPrefix))
+        if(callbackData.getPrefix().Equals(Keyboards.ModDeleteFlaggedPrefix))
         {
           // Der Admin entscheided den geflaggten Post zu entfernen
           int messageId = this.posts.getMessageId(callbackData.getId());
@@ -1270,7 +1254,7 @@ namespace DRaumServerApp
           await this.adminBot.sendMessageWithKeyboard(this.adminChatId, resultText, Keyboards.getGotItDeleteButtonKeyboard());
           return;
         }
-        if(callbackData.getPrefix().Equals(modClearFlagPrefix))
+        if(callbackData.getPrefix().Equals(Keyboards.ModClearFlagPrefix))
         {
           // Der Admin entscheided, den Flag zurückzunehmen
           if (this.posts.removeFlagFromPost(callbackData.getId()))
@@ -1296,7 +1280,7 @@ namespace DRaumServerApp
       {
         DRaumCallbackData callbackData = DRaumCallbackData.parseCallbackData(e.CallbackQuery.Data);
         // ==  Der Moderator akzeptiert den Beitrag
-        if (callbackData.getPrefix().Equals(modAcceptPrefix))
+        if (callbackData.getPrefix().Equals(Keyboards.ModAcceptPrefix))
         {          
           if(this.acceptPostForPublishing(callbackData.getId()).Result)
           {
@@ -1320,7 +1304,7 @@ namespace DRaumServerApp
           return;
         }
         // ==  Der Moderator will den Beitrag bearbeiten und zurücksenden
-        if (callbackData.getPrefix().Equals(modEditPrefix))
+        if (callbackData.getPrefix().Equals(Keyboards.ModEditPrefix))
         {
           await this.telegramModerateBot.EditMessageReplyMarkupAsync(
             chatId: this.moderateChatId,
@@ -1336,7 +1320,7 @@ namespace DRaumServerApp
           return;
         }
         // ==  Der Moderator lehnt den Beitrag ab
-        if (callbackData.getPrefix().Equals(modBlockPrefix))
+        if (callbackData.getPrefix().Equals(Keyboards.ModBlockPrefix))
         {
           // Nachricht entfernen
           await this.telegramModerateBot.DeleteMessageAsync(
@@ -1351,14 +1335,14 @@ namespace DRaumServerApp
           return;
         }
         // TODO Der Moderator blockt den Nutzer für einen Tag/ für eine Woche/ für einen Monat
-        if(callbackData.getPrefix().Equals(genericMessageDeletePrefix))
+        if(callbackData.getPrefix().Equals(Keyboards.GenericMessageDeletePrefix))
         {
           await this.telegramModerateBot.DeleteMessageAsync(
             chatId: this.moderateChatId,
             messageId: e.CallbackQuery.Message.MessageId);
           return;
         }
-        if(callbackData.getPrefix().Equals(modGetNextCheckPostPrefix))
+        if(callbackData.getPrefix().Equals(Keyboards.ModGetNextCheckPostPrefix))
         {
           KeyValuePair<long, string> postingPair = this.posts.getNextPostToCheck();
           if (postingPair.Key != -1)
@@ -1406,7 +1390,7 @@ namespace DRaumServerApp
         {
           // Auswerten: Vote-up, Vote-down, Flag
           DRaumCallbackData callbackData = DRaumCallbackData.parseCallbackData(e.CallbackQuery.Data);
-          if (callbackData.getPrefix().Equals(voteUpPrefix))
+          if (callbackData.getPrefix().Equals(Keyboards.VoteUpPrefix))
           {
             // UPVOTE
             string responseText = "Stimme bereits abgegeben oder eigener Post";
@@ -1432,7 +1416,7 @@ namespace DRaumServerApp
             );
             return;
           }
-          if (callbackData.getPrefix().Equals(voteDownPrefix))
+          if (callbackData.getPrefix().Equals(Keyboards.VoteDownPrefix))
           {
             // DOWNVOTE
             string responseText = "Stimme bereits abgegeben oder eigener Post";
@@ -1458,7 +1442,7 @@ namespace DRaumServerApp
             );
             return;
           }
-          if (callbackData.getPrefix().Equals(flagPrefix))
+          if (callbackData.getPrefix().Equals(Keyboards.FlagPrefix))
           {
             // Flagging
             if (!this.authors.isCoolDownOver(e.CallbackQuery.From.Id, e.CallbackQuery.From.Username,
@@ -1512,7 +1496,7 @@ namespace DRaumServerApp
       if (e.CallbackQuery.Data != null)
       {
         DRaumCallbackData callbackData = DRaumCallbackData.parseCallbackData(e.CallbackQuery.Data);
-        if (callbackData.getPrefix().Equals(modAcceptPrefix))
+        if (callbackData.getPrefix().Equals(Keyboards.ModAcceptPrefix))
         {
           if(this.acceptPostForPublishing(callbackData.getId()).Result)
           {
@@ -1526,20 +1510,20 @@ namespace DRaumServerApp
           }
           return;
         }
-        if (callbackData.getPrefix().Equals(modBlockPrefix))
+        if (callbackData.getPrefix().Equals(Keyboards.ModBlockPrefix))
         {
           this.posts.deletePost(callbackData.getId());
           await this.inputBot.removeMessage(e.CallbackQuery.Message.MessageId, e.CallbackQuery.From.Id);
           await this.inputBot.sendMessage(e.CallbackQuery.From.Id, "Der Post wird nicht veröffentlicht und verworfen.");
           return;
         }
-        if (callbackData.getPrefix().Equals(modeWritePrefix))
+        if (callbackData.getPrefix().Equals(Keyboards.ModeWritePrefix))
         {
           await this.inputBot.switchToWriteMode(e.CallbackQuery.From.Id, e.CallbackQuery.From.Username,
             e.CallbackQuery.From.Id);
           return;
         }
-        if (callbackData.getPrefix().Equals(modeFeedbackPrefix))
+        if (callbackData.getPrefix().Equals(Keyboards.ModeFeedbackPrefix))
         {
           await this.inputBot.switchToFeedbackMode(e.CallbackQuery.From.Id, e.CallbackQuery.From.Username,
             e.CallbackQuery.From.Id);

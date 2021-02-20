@@ -46,7 +46,7 @@ namespace DRaumServerApp.telegram
       }
     }
 
-    internal async Task periodicFeedbackSendingTask(TimeSpan interval, CancellationToken cancellationToken)
+    private async Task periodicFeedbackSendingTask(TimeSpan interval, CancellationToken cancellationToken)
     {
       logger.Info("Feedback-Senden-Task ist gestartet");
       SyncManager.register();
@@ -80,8 +80,8 @@ namespace DRaumServerApp.telegram
       // erhaltene Feedbacks verarbeiten, wenn grad keine Antwort geschrieben wird
       FeedbackElement feedback = this.feedbackManager.dequeueFeedback();
       bool fail = false;
-      InlineKeyboardButton replyButton = InlineKeyboardButton.WithCallbackData("Antworten", DRaumManager.modAcceptPrefix + feedback.chatID);
-      InlineKeyboardButton dismissButton = InlineKeyboardButton.WithCallbackData("Verwerfen", DRaumManager.modBlockPrefix + feedback.chatID);
+      InlineKeyboardButton replyButton = InlineKeyboardButton.WithCallbackData("Antworten", Keyboards.ModAcceptPrefix + feedback.chatID);
+      InlineKeyboardButton dismissButton = InlineKeyboardButton.WithCallbackData("Verwerfen", Keyboards.ModBlockPrefix + feedback.chatID);
       List<InlineKeyboardButton> buttonlist = new List<InlineKeyboardButton>
       {
         replyButton,

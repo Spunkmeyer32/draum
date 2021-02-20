@@ -1,6 +1,7 @@
 ﻿using System;
 using Telegram.Bot;
 using System.Threading.Tasks;
+using JetBrains.Annotations;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.ReplyMarkups;
 
@@ -10,22 +11,14 @@ namespace DRaumServerApp.telegram
   {
     private static readonly NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
 
-
-    private readonly AuthorManager authors;
     private readonly TelegramBotClient telegramAdminBot;
-    private readonly DRaumStatistics statistics;
-    private readonly PostingManager posts;
-    private readonly FeedbackManager feedbackManager;
 
-    internal AdminBot(AuthorManager authors, DRaumStatistics statistics, TelegramBotClient telegramAdminBot, PostingManager posts, FeedbackManager feedbackManager)
+    internal AdminBot(TelegramBotClient telegramAdminBot)
     {
-      this.authors = authors;
-      this.statistics = statistics;
       this.telegramAdminBot = telegramAdminBot;
-      this.posts = posts;
-      this.feedbackManager = feedbackManager;
     }
 
+  
     internal async Task removeMessage(int messageId, long adminChatId)
     {
       try
@@ -42,6 +35,7 @@ namespace DRaumServerApp.telegram
     }
 
 
+    [ItemCanBeNull]
     internal async Task<Message> sendMessage(long chatId, string message)
     {
       try
@@ -49,7 +43,7 @@ namespace DRaumServerApp.telegram
         return await this.telegramAdminBot.SendTextMessageAsync(
           chatId: chatId,
           text: message
-        );
+        ).ConfigureAwait(false);
       }
       catch (Exception ex)
       {
@@ -65,7 +59,7 @@ namespace DRaumServerApp.telegram
         await this.telegramAdminBot.EditMessageTextAsync(
           chatId: chatId,
           messageId: messageId,
-          text: message);
+          text: message).ConfigureAwait(false);
       }
       catch (Exception ex)
       {
@@ -80,7 +74,7 @@ namespace DRaumServerApp.telegram
         await this.telegramAdminBot.AnswerCallbackQueryAsync(
           callbackQueryId: callbackId,
           text: message,
-          showAlert: true);
+          showAlert: true).ConfigureAwait(false);
       }
       catch (Exception ex)
       {
@@ -88,6 +82,7 @@ namespace DRaumServerApp.telegram
       }
     }
 
+    [ItemCanBeNull]
     internal async Task<Message> sendMessageWithKeyboard(long chatId, string message, InlineKeyboardMarkup keyboard)
     {
       try
@@ -96,7 +91,7 @@ namespace DRaumServerApp.telegram
           chatId: chatId,
           text: message,
           replyMarkup: keyboard
-        );
+        ).ConfigureAwait(false);
       }
       catch (Exception ex)
       {
