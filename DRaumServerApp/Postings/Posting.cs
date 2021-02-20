@@ -1,23 +1,18 @@
-﻿using Newtonsoft.Json;
-using System;
-using System.Collections.Concurrent;
-using System.Linq;
+﻿using System;
 using System.Runtime.CompilerServices;
-
+using Newtonsoft.Json;
 
 [assembly: InternalsVisibleTo("DRaumServerTest")]
-
-namespace DRaumServerApp
+namespace DRaumServerApp.Postings
 {
-  
-  class Posting
+  internal class Posting
   {
     [JsonIgnore]
     private readonly object textMutex = new object();
     [JsonIgnore]
     private readonly object flagDataMutex = new object();
     [JsonIgnore]
-    internal static int DAYSUNTILDELETENORMAL = 76;
+    internal static int Daysuntildeletenormal = 76;
     [JsonIgnore]
     private readonly object upvoteMutex = new object();
     [JsonIgnore]
@@ -28,7 +23,7 @@ namespace DRaumServerApp
     [JsonProperty]
     private readonly long postingId;
     [JsonProperty]
-    private readonly long authorID;
+    private readonly long authorId;
     [JsonProperty]
     private readonly DateTime submitTimestamp;
     [JsonProperty]
@@ -50,7 +45,7 @@ namespace DRaumServerApp
     [JsonProperty]
     private volatile bool dirtyTextFlag; // Markiert den Post für ein Update im Chat
     [JsonProperty]
-    private String postText;   
+    private string postText;   
     [JsonProperty]
     private long upVotes;
     [JsonProperty]
@@ -62,15 +57,15 @@ namespace DRaumServerApp
     internal Posting() 
     {
       this.postingId = -1;
-      this.authorID = -1;
+      this.authorId = -1;
       this.setDefaults();
       this.submitTimestamp = DateTime.Now;
     }
 
-    internal Posting(long id, string text, long authorID)
+    internal Posting(long id, string text, long authorId)
     {      
       this.postingId = id;
-      this.authorID = authorID;
+      this.authorId = authorId;
       this.setDefaults();      
       this.postText = text;
       this.submitTimestamp = DateTime.Now;
@@ -90,7 +85,7 @@ namespace DRaumServerApp
       this.dirtyFlag = false;
       this.dirtyTextFlag = false;
       this.isTopPost = false;
-      this.daysBeforeDelete = DAYSUNTILDELETENORMAL;
+      this.daysBeforeDelete = Daysuntildeletenormal;
     }
 
     internal DateTime getPublishTimestamp()
@@ -106,14 +101,14 @@ namespace DRaumServerApp
       return this.upVotes + this.downVotes;
     }
 
-    internal long getPostID()
+    internal long getPostId()
     {
       return this.postingId;
     }
 
-    internal long getAuthorID()
+    internal long getAuthorId()
     {
-      return this.authorID;
+      return this.authorId;
     }
 
     internal string getPostingText()
@@ -135,17 +130,6 @@ namespace DRaumServerApp
       }
     }
 
-    internal void updateText(string text)
-    {
-      lock (this.textMutex)
-      {
-        if (!text.Equals(this.postText))
-        {
-          this.postText = text;
-          this.dirtyTextFlag = true;
-        }
-      }      
-    }
 
     internal void updateText(string text, bool dontSetDirtyFlag)
     {
@@ -164,14 +148,14 @@ namespace DRaumServerApp
 
     private void calculateDaysToDelete()
     {
-      int newDays = 0;
+      int newDays;
       if(this.isTopPost)
       {
-        newDays = DAYSUNTILDELETENORMAL + (int)((float)(this.getUpVotePercentage() - 50) * 1.5);
+        newDays = Daysuntildeletenormal + (int)((this.getUpVotePercentage() - 50) * 1.5);
       }
       else
       {
-        newDays = DAYSUNTILDELETENORMAL + (int)((float)(this.getUpVotePercentage() - 50) * 1.2);
+        newDays = Daysuntildeletenormal + (int)((this.getUpVotePercentage() - 50) * 1.2);
       }
       if (newDays != this.daysBeforeDelete)
       {
@@ -186,7 +170,7 @@ namespace DRaumServerApp
       {
         return 50;
       }
-      float r = (float)this.upVotes / (float)(this.upVotes + this.downVotes);
+      float r = this.upVotes / (float)(this.upVotes + this.downVotes);
       return (int)(Math.Ceiling((r * 100.0f)));
     }
 
@@ -309,32 +293,32 @@ namespace DRaumServerApp
       return this.downVotes;
     }
 
-    internal void setChatMessageID(int messageId)
+    internal void setChatMessageId(int messageId)
     {
       this.chatMessageId = messageId;
     }
 
-    internal int getChatMessageID()
+    internal int getChatMessageId()
     {
       return this.chatMessageId;
     }
 
-    internal void setChatMessageDailyID(int messageId)
+    internal void setChatMessageDailyId(int messageId)
     {
       this.chatMessageDailyId = messageId;
     }
 
-    internal int getChatMessageDailyID()
+    internal int getChatMessageDailyId()
     {
       return this.chatMessageDailyId;
     }
 
-    internal void setChatMessageWeeklyID(int messageId)
+    internal void setChatMessageWeeklyId(int messageId)
     {
       this.chatMessageWeeklyId = messageId;
     }
 
-    internal int getChatMessageWeeklyID()
+    internal int getChatMessageWeeklyId()
     {
       return this.chatMessageWeeklyId;
     }

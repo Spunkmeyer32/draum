@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Threading.Tasks;
+using DRaumServerApp.Authors;
+using DRaumServerApp.Postings;
 using Telegram.Bot;
 using Telegram.Bot.Types.ReplyMarkups;
 
-namespace DRaumServerApp.telegram
+namespace DRaumServerApp.Bots
 {
   internal class InputBot
   {
@@ -74,10 +76,10 @@ namespace DRaumServerApp.telegram
     {
       try
       {
-        if (!this.authors.isCoolDownOver(authorid, authorname, Author.InteractionCooldownTimer.POSTING))
+        if (!this.authors.isCoolDownOver(authorid, authorname, Author.InteractionCooldownTimer.Posting))
         {
           TimeSpan coolDownTime =
-            this.authors.getCoolDownTimer(authorid, authorname, Author.InteractionCooldownTimer.POSTING);
+            this.authors.getCoolDownTimer(authorid, authorname, Author.InteractionCooldownTimer.Posting);
           string msgCoolDownText = "(Spamvermeidung) Zeit bis zum nächsten Posting: " +
                                    coolDownTime.TotalMinutes.ToString("0.0") + " Minute(n)";
           if (coolDownTime.TotalMinutes > 180)
@@ -95,7 +97,7 @@ namespace DRaumServerApp.telegram
         this.authors.setPostMode(authorid, authorname);
         await this.telegramInputBot.SendTextMessageAsync(
           chatId: chatid,
-          text: DRaumManager.postIntro
+          text: DRaumManager.PostIntro
         );
       }
       catch (Exception ex)
@@ -115,10 +117,10 @@ namespace DRaumServerApp.telegram
     {
       try
       {
-        if (!this.authors.isCoolDownOver(authorid, authorname, Author.InteractionCooldownTimer.FEEDBACK))
+        if (!this.authors.isCoolDownOver(authorid, authorname, Author.InteractionCooldownTimer.Feedback))
         {
           TimeSpan coolDownTime =
-            this.authors.getCoolDownTimer(authorid, authorname, Author.InteractionCooldownTimer.FEEDBACK);
+            this.authors.getCoolDownTimer(authorid, authorname, Author.InteractionCooldownTimer.Feedback);
           string msgCoolDownText = "(Spamvermeidung) Zeit bis zur nächsten Feedbackmöglichkeit: " +
                                    coolDownTime.TotalMinutes.ToString("0.0") + " Minute(n)";
           if (coolDownTime.TotalMinutes > 180)
@@ -136,7 +138,7 @@ namespace DRaumServerApp.telegram
         this.authors.setFeedbackMode(authorid, authorname);
         await this.telegramInputBot.SendTextMessageAsync(
           chatId: chatid,
-          text: DRaumManager.feedbackIntro
+          text: DRaumManager.FeedbackIntro
         );
       }
       catch (Exception ex)
@@ -170,13 +172,13 @@ namespace DRaumServerApp.telegram
             return;
           }
           this.statistics.increaseInteraction();
-          this.authors.resetCoolDown(authorid, authorname, Author.InteractionCooldownTimer.POSTING);
-          this.authors.resetCoolDown(authorid, authorname, Author.InteractionCooldownTimer.DEFAULT);
+          this.authors.resetCoolDown(authorid, authorname, Author.InteractionCooldownTimer.Posting);
+          this.authors.resetCoolDown(authorid, authorname, Author.InteractionCooldownTimer.Default);
           this.authors.unsetModes(authorid, authorname);
           this.posts.addPosting(posttext, authorid);
           await this.telegramInputBot.SendTextMessageAsync(
             chatId: chatid,
-            text: DRaumManager.replyPost + "\r\nMeldung des Spamfilters: " + message
+            text: DRaumManager.ReplyPost + "\r\nMeldung des Spamfilters: " + message
           );
           return;
         }
@@ -193,16 +195,15 @@ namespace DRaumServerApp.telegram
             return;
           }
           this.statistics.increaseInteraction();
-          this.authors.resetCoolDown(authorid, authorname, Author.InteractionCooldownTimer.FEEDBACK);
-          this.authors.resetCoolDown(authorid, authorname, Author.InteractionCooldownTimer.DEFAULT);
+          this.authors.resetCoolDown(authorid, authorname, Author.InteractionCooldownTimer.Feedback);
+          this.authors.resetCoolDown(authorid, authorname, Author.InteractionCooldownTimer.Default);
           this.authors.unsetModes(authorid, authorname);
           this.feedbackManager.enqueueFeedback(
             new FeedbackElement("Von: @" + authorname + " ID(" + authorid + ") : " + feedbacktext, chatid));
           await this.telegramInputBot.SendTextMessageAsync(
             chatId: chatid,
-            text: DRaumManager.replyFeedback
+            text: DRaumManager.ReplyFeedback
           );
-          return;
         }
       }
       catch(Exception ex)

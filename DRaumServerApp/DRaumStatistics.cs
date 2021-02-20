@@ -71,12 +71,12 @@ namespace DRaumServerApp
       return false;
     }
 
-    internal String getHardwareInfo()
+    internal string getHardwareInfo()
     {
       hardwareInfo.RefreshMemoryStatus();
       hardwareInfo.RefreshDriveList();
       StringBuilder sb = new StringBuilder();
-      sb.Append((((double)hardwareInfo.MemoryStatus.AvailablePhysical / 1024.0) / 1024.0).ToString("0.00"));
+      sb.Append(((hardwareInfo.MemoryStatus.AvailablePhysical / 1024.0) / 1024.0).ToString("0.00"));
       sb.Append(" MB freier RAM\r\n");
       foreach (var drive in hardwareInfo.DriveList)
       {
@@ -86,12 +86,13 @@ namespace DRaumServerApp
           {
             sb.Append(volume.Name);
             sb.Append(" hat ");
-            sb.Append((((double)volume.FreeSpace / 1024.0) / 1024.0).ToString("0.0"));
+            sb.Append(((volume.FreeSpace / 1024.0) / 1024.0).ToString("0.0"));
             sb.Append(" MB freien Platz");
             sb.Append("\r\n");
           }
         }
       }
+
       SystemMetrics systemMetrics = new SystemMetrics();
       Metrics result = systemMetrics.GetMetrics();
       sb.Append(result.TotalCpuUsage.ToString("0.0"));

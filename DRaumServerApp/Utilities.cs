@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 using Telegram.Bot.Types;
@@ -7,16 +6,16 @@ using Telegram.Bot.Types.Enums;
 
 namespace DRaumServerApp
 {
-  internal class Utilities
+  internal static class Utilities
   {
     private static readonly NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
 
-    private static bool nextLevelCalculated = false;
-    private static long[] nextLevelExp;
+    private static bool _nextLevelCalculated;
+    private static long[] _nextLevelExp;
 
-    public static bool RUNNINGINTESTMODE = false;
+    public static bool Runningintestmode = false;
 
-    public static CultureInfo usedCultureInfo = CultureInfo.CreateSpecificCulture("de-DE");
+    public static readonly CultureInfo UsedCultureInfo = CultureInfo.CreateSpecificCulture("de-DE");
 
     internal static string getHumanAbbrevNumber(long number)
     {
@@ -32,41 +31,47 @@ namespace DRaumServerApp
     }
 
     private const int Maxinsertchars = 50;
-    private static char[] temp = new char[Maxinsertchars];
+    private static readonly char[] temp = new char[Maxinsertchars];
 
-    private static void insert(ref char[][] strarray, int targetChar, string insert)
+    private static void insert(ref char[][] strarray, ref int[] startposarray, int targetChar, string insert)
     {
       int i;
       int inslen = insert.Length;
-      for (i = 0; i < Maxinsertchars; i++)
+      int k = 0;
+      for (i = startposarray[targetChar]; i < Maxinsertchars; i++)
       {
         if (strarray[targetChar][i] == '\0')
         {
-          temp[i] = '\0';
+          temp[k] = '\0';
           break;
         }
-        temp[i] = strarray[targetChar][i];
+
+        temp[k] = strarray[targetChar][i];
+        k++;
       }
       for (i = 0; i < inslen; i++)
       {
-        strarray[targetChar][i] = insert[i];
+        strarray[targetChar][startposarray[targetChar]+i] = insert[i];
       }
-      for (i = 0; i < Maxinsertchars-inslen; i++)
+      for (i = 0; i < Maxinsertchars-(inslen+startposarray[targetChar]); i++)
       {
         if (temp[i] == '\0')
         {
-          strarray[targetChar][inslen + i] = '\0';
+          strarray[targetChar][startposarray[targetChar] + inslen + i] = '\0';
+          startposarray[targetChar] = (inslen+i) - 1;
           break;
         }
-        strarray[targetChar][inslen + i] = temp[i];
+        strarray[targetChar][startposarray[targetChar] + inslen + i] = temp[i];
       }
     }
 
     internal static string telegramEntitiesToHtml(string text, MessageEntity[] entities)
     {
       char[][] strarray = new char[text.Length][];
+      int[] startposarray = new int[text.Length];
       for (int i = 0; i < text.Length; i++)
       {
+        startposarray[i] = 0;
         int replacementLength = 1;
         strarray[i] = new char[Maxinsertchars];
         if (text[i] == '&')
@@ -110,30 +115,34 @@ namespace DRaumServerApp
         }
         strarray[i][replacementLength] = '\0';
       }
-      foreach (MessageEntity entity in entities)
+
+      if (entities != null)
       {
-        switch (entity.Type)
+        foreach (MessageEntity entity in entities)
         {
-          case MessageEntityType.Bold:
-            insert(ref strarray, entity.Offset, "<b>");
-            insert(ref strarray, entity.Offset+entity.Length, "</b>");
-            break;
-          case MessageEntityType.Italic:
-            insert(ref strarray, entity.Offset, "<i>");
-            insert(ref strarray, entity.Offset+entity.Length, "</i>");
-            break;
-          case MessageEntityType.Underline:
-            insert(ref strarray, entity.Offset, "<u>");
-            insert(ref strarray, entity.Offset+entity.Length, "</u>");
-            break;
-          case MessageEntityType.Strikethrough:
-            insert(ref strarray, entity.Offset, "<s>");
-            insert(ref strarray, entity.Offset+entity.Length, "</s>");
-            break;
-          case MessageEntityType.Code:
-            insert(ref strarray, entity.Offset, "<code>");
-            insert(ref strarray, entity.Offset+entity.Length, "</code>");
-            break;
+          switch (entity.Type)
+          {
+            case MessageEntityType.Bold:
+              insert(ref strarray, ref startposarray, entity.Offset, "<b>");
+              insert(ref strarray, ref startposarray, entity.Offset + entity.Length, "</b>");
+              break;
+            case MessageEntityType.Italic:
+              insert(ref strarray, ref startposarray, entity.Offset, "<i>");
+              insert(ref strarray, ref startposarray, entity.Offset + entity.Length, "</i>");
+              break;
+            case MessageEntityType.Underline:
+              insert(ref strarray, ref startposarray, entity.Offset, "<u>");
+              insert(ref strarray, ref startposarray, entity.Offset + entity.Length, "</u>");
+              break;
+            case MessageEntityType.Strikethrough:
+              insert(ref strarray, ref startposarray, entity.Offset, "<s>");
+              insert(ref strarray, ref startposarray, entity.Offset + entity.Length, "</s>");
+              break;
+            case MessageEntityType.Code:
+              insert(ref strarray, ref startposarray, entity.Offset, "<code>");
+              insert(ref strarray, ref startposarray, entity.Offset + entity.Length, "</code>");
+              break;
+          }
         }
       }
 
@@ -153,20 +162,21 @@ namespace DRaumServerApp
 
     internal static long getNextLevelExp(int actualLevel)
     {
-      if(!nextLevelCalculated)
+      if(!_nextLevelCalculated)
       {
         long expsum = 0;
-        nextLevelExp = new long[500];
+        _nextLevelExp = new long[500];
         for( int i = 0 ; i < 500 ; i++ )
         {
-          nextLevelExp[i] = expsum + (long) Math.Round(8 + 0.25 * (i ^ 3) + 0.6 * (i ^ 2) + 8 * i);
-          expsum = nextLevelExp[i];
+          _nextLevelExp[i] = expsum + (long) Math.Round(8 + 0.25 * (i ^ 3) + 0.6 * (i ^ 2) + 8 * i);
+          expsum = _nextLevelExp[i];
           if (i%10==0)
           {
-            logger.Info("lvl " + i + " : " + nextLevelExp[i] + " , " + expsum);
+            logger.Info("lvl " + i + " : " + _nextLevelExp[i] + " , " + expsum);
           }
         }
-        nextLevelCalculated = true;
+
+        _nextLevelCalculated = true;
       }
       if (actualLevel <= 0)
       {
@@ -174,7 +184,7 @@ namespace DRaumServerApp
       }
       if(actualLevel < 500)
       {
-        return nextLevelExp[actualLevel];
+        return _nextLevelExp[actualLevel];
       }
       else
       {

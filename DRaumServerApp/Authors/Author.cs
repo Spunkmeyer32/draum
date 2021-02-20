@@ -1,21 +1,22 @@
-﻿using Newtonsoft.Json;
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Linq;
+using DRaumServerApp.Postings;
+using Newtonsoft.Json;
 
-namespace DRaumServerApp
+namespace DRaumServerApp.Authors
 {
-  class Author
+  internal class Author
   {
 
-    public enum InteractionCooldownTimer { NONE, DEFAULT, POSTING, FLAGGING, FEEDBACK };
+    public enum InteractionCooldownTimer {  Default, Posting, Flagging, Feedback };
 
-    internal static int COOLDOWNMINUTES = 2;
-    internal static int COOLDOWNMINUTESFLAGGING = 30;
-    internal static int COOLDOWNHOURSPOSTING = 3;
-    internal static int COOLDOWNHOURSFEEDBACK = 1;
-    private static int EXP_FOR_POSTING = 16;
-    private static int EXP_FOR_VOTE = 7;
+    internal static int Cooldownminutes = 2;
+    internal static int Cooldownminutesflagging = 30;
+    internal static int Cooldownhoursposting = 3;
+    internal static int Cooldownhoursfeedback = 1;
+    private static int _expForPosting = 16;
+    private static int _expForVote = 7;
 
     [JsonIgnore]
     private DateTime coolDownTimeStamp;
@@ -82,11 +83,7 @@ namespace DRaumServerApp
 
     internal bool canVote(long postId)
     {
-      if (this.votedPosts.Contains(postId))
-      {
-        return false;
-      }
-      return true;
+      return !this.votedPosts.Contains(postId);
     }
 
     internal void vote(long postingId)
@@ -101,27 +98,24 @@ namespace DRaumServerApp
 
     internal bool canFlag(long postId)
     {
-      if (this.flaggedPosts.Contains(postId))
-      {
-        return false;
-      }         
-      return true;
+      return !this.flaggedPosts.Contains(postId);
     }
 
-    internal PostingPublishManager.publishHourType getPublishType(int premiumLevelCap)
+    internal PostingPublishManager.PublishHourType getPublishType(int premiumLevelCap)
     {
-      if (!Utilities.RUNNINGINTESTMODE)
+      if (Utilities.Runningintestmode)
       {
-        if (this.level > premiumLevelCap)
-        {
-          return PostingPublishManager.publishHourType.PREMIUM;
-        }
-        if (this.postCount < 3)
-        {
-          return PostingPublishManager.publishHourType.HAPPY;
-        }
+        return PostingPublishManager.PublishHourType.Normal;
       }
-      return PostingPublishManager.publishHourType.NORMAL;
+      if (this.level > premiumLevelCap)
+      {
+        return PostingPublishManager.PublishHourType.Premium;
+      }
+      if (this.postCount < 3)
+      {
+        return PostingPublishManager.PublishHourType.Happy;
+      }
+      return PostingPublishManager.PublishHourType.Normal;
     }
 
     internal void updateCredibility(long receivedUpVotes, long receivedDownVotes)
@@ -153,18 +147,13 @@ namespace DRaumServerApp
       return "Level " + this.getLevel() + " Schreiber/in mit " + percentage + " Prozent  Zustimmung";
     }
 
-    internal string getFullAuthorInfo()
-    {
-      return "@"+this.authorName + " ("+this.authorId+")\r\n" + this.getShortAuthorInfo();
-    }
-
     internal void publishedSuccessfully()
     {
-      this.exp += EXP_FOR_POSTING;
+      this.exp += _expForPosting;
       this.postCount += 1;
     }
 
-    internal long getTotalVotes()
+    private long getTotalVotes()
     {
       return this.upvotesReceived + this.downvotesReceived;
     }
@@ -197,20 +186,20 @@ namespace DRaumServerApp
 
     internal bool coolDownOver(InteractionCooldownTimer timerType)
     {
-      DateTime cooldownTS = this.coolDownTimeStamp;
+      DateTime cooldownTs = this.coolDownTimeStamp;
       switch(timerType)
       {
-        case InteractionCooldownTimer.FEEDBACK:
-          cooldownTS = this.coolDownTimeStampFeedback;
+        case InteractionCooldownTimer.Feedback:
+          cooldownTs = this.coolDownTimeStampFeedback;
           break;
-        case InteractionCooldownTimer.FLAGGING:
-          cooldownTS = this.coolDownTimeStampFlagging;
+        case InteractionCooldownTimer.Flagging:
+          cooldownTs = this.coolDownTimeStampFlagging;
           break;
-        case InteractionCooldownTimer.POSTING:
-          cooldownTS = this.coolDownTimeStampPosting;
+        case InteractionCooldownTimer.Posting:
+          cooldownTs = this.coolDownTimeStampPosting;
           break;
       }
-      if(cooldownTS < DateTime.Now)
+      if(cooldownTs < DateTime.Now)
       {
         return true;
       }
@@ -219,37 +208,37 @@ namespace DRaumServerApp
 
     internal TimeSpan getCoolDownTimer(InteractionCooldownTimer timerType)
     {
-      DateTime cooldownTS = this.coolDownTimeStamp;
+      DateTime cooldownTs = this.coolDownTimeStamp;
       switch (timerType)
       {
-        case InteractionCooldownTimer.FEEDBACK:
-          cooldownTS = this.coolDownTimeStampFeedback;
+        case InteractionCooldownTimer.Feedback:
+          cooldownTs = this.coolDownTimeStampFeedback;
           break;
-        case InteractionCooldownTimer.FLAGGING:
-          cooldownTS = this.coolDownTimeStampFlagging;
+        case InteractionCooldownTimer.Flagging:
+          cooldownTs = this.coolDownTimeStampFlagging;
           break;
-        case InteractionCooldownTimer.POSTING:
-          cooldownTS = this.coolDownTimeStampPosting;
+        case InteractionCooldownTimer.Posting:
+          cooldownTs = this.coolDownTimeStampPosting;
           break;
       }
-      return cooldownTS.Subtract(DateTime.Now);
+      return cooldownTs.Subtract(DateTime.Now);
     }
 
     internal void resetCoolDown(InteractionCooldownTimer timerType)
     {
       switch (timerType)
       {
-        case InteractionCooldownTimer.FEEDBACK:
-          this.coolDownTimeStampFeedback = DateTime.Now.AddHours(COOLDOWNHOURSFEEDBACK);
+        case InteractionCooldownTimer.Feedback:
+          this.coolDownTimeStampFeedback = DateTime.Now.AddHours(Cooldownhoursfeedback);
           break;
-        case InteractionCooldownTimer.FLAGGING:
-          this.coolDownTimeStampFlagging = DateTime.Now.AddMinutes(COOLDOWNMINUTESFLAGGING);
+        case InteractionCooldownTimer.Flagging:
+          this.coolDownTimeStampFlagging = DateTime.Now.AddMinutes(Cooldownminutesflagging);
           break;
-        case InteractionCooldownTimer.POSTING:
-          this.coolDownTimeStampPosting = DateTime.Now.AddHours(COOLDOWNHOURSPOSTING);
+        case InteractionCooldownTimer.Posting:
+          this.coolDownTimeStampPosting = DateTime.Now.AddHours(Cooldownhoursposting);
           break;
-        case InteractionCooldownTimer.DEFAULT:
-          this.coolDownTimeStamp = DateTime.Now.AddMinutes(COOLDOWNMINUTES);
+        case InteractionCooldownTimer.Default:
+          this.coolDownTimeStamp = DateTime.Now.AddMinutes(Cooldownminutes);
           break;
       }
     }
@@ -266,7 +255,7 @@ namespace DRaumServerApp
 
     internal int voteUpAndGetCount()
     {
-      this.exp += EXP_FOR_VOTE;
+      this.exp += _expForVote;
       if (this.votingGauge <= 0)
       {
         this.votingGauge += 1;
@@ -286,7 +275,7 @@ namespace DRaumServerApp
 
     internal int voteDownAndGetCount()
     {
-      this.exp += EXP_FOR_VOTE;
+      this.exp += _expForVote;
       if (this.votingGauge >= 0)
       {
         this.votingGauge -= 1;

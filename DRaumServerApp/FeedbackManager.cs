@@ -12,9 +12,9 @@ namespace DRaumServerApp
     [JsonIgnore]
     private readonly object dataMutexFeedback = new object();
     [JsonIgnore]
-    private int moderateMessageID = -1;
+    private int moderateMessageId = -1;
     [JsonIgnore]
-    private int adminStatisticMessageID = -1;
+    private int adminStatisticMessageId = -1;
 
     [JsonProperty]
     private ConcurrentQueue<FeedbackElement> feedBacks;
@@ -27,7 +27,7 @@ namespace DRaumServerApp
     [JsonProperty]
     private bool waitForFeedbackReply;
     [JsonProperty]
-    private long nextChatIDForFeedback;
+    private long nextChatIdForFeedback;
 
     internal FeedbackManager()
     {
@@ -57,24 +57,24 @@ namespace DRaumServerApp
       return (this.feedBacks.Count != 0);
     }
 
-    internal int getModerateMessageID()
+    internal int getModerateMessageId()
     {
-      return this.moderateMessageID;
+      return this.moderateMessageId;
     }
 
-    internal void setModerateMessageID(int messageID)
+    internal void setModerateMessageId(int messageId)
     {
-      this.moderateMessageID = messageID;
+      this.moderateMessageId = messageId;
     }
 
-    internal int getAdminStatisticMessageID()
+    internal int getAdminStatisticMessageId()
     {
-      return this.adminStatisticMessageID;
+      return this.adminStatisticMessageId;
     }
 
-    internal void setAdminStatisticMessageID(int messageID)
+    internal void setAdminStatisticMessageId(int messageId)
     {
-      this.adminStatisticMessageID = messageID;
+      this.adminStatisticMessageId = messageId;
     }
 
     internal void waitForModerationText(long id)
@@ -92,16 +92,16 @@ namespace DRaumServerApp
       lock(this.dataMutexFeedback)
       {
         this.waitForFeedbackReply = true;
-        this.nextChatIDForFeedback = chatid;
+        this.nextChatIdForFeedback = chatid;
       }
     }
 
-    internal long processFeedbackReplyAndGetChatID()
+    internal long processFeedbackReplyAndGetChatId()
     {
       lock(this.dataMutexFeedback)
       {
         this.waitForFeedbackReply = false;
-        return this.nextChatIDForFeedback;
+        return this.nextChatIdForFeedback;
       }
     }
 
@@ -115,7 +115,7 @@ namespace DRaumServerApp
       }
     }
 
-    internal long getNextModeratedPostID()
+    internal long getNextModeratedPostId()
     {
       lock(this.dataMutex)
       {

@@ -5,7 +5,7 @@ using System.Text;
 
 namespace DRaumServerApp
 {
-  class DRaumException : Exception
+  internal class DRaumException : Exception
   {
     public DRaumException()
     {

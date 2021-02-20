@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using Telegram.Bot.Types.ReplyMarkups;
 
-namespace DRaumServerApp.telegram
+namespace DRaumServerApp.TelegramUtilities
 {
   /// <summary>
   /// Stellt alle Inline-Keyboards zur Verfügung, die für den D-Raum verwendet werden
@@ -62,8 +62,7 @@ namespace DRaumServerApp.telegram
       return _getGotItDeleteButtonKeyboard ??= new InlineKeyboardMarkup(
         new List<InlineKeyboardButton>
         {
-          InlineKeyboardButton.WithCallbackData("Verstanden, Ausblenden",
-            GenericMessageDeletePrefix + "0")
+          InlineKeyboardButton.WithCallbackData("Verstanden, Ausblenden", GenericMessageDeletePrefix + "0")
         });
     }
 
@@ -76,8 +75,7 @@ namespace DRaumServerApp.telegram
     {
       return new InlineKeyboardMarkup(new List<InlineKeyboardButton>
       {
-        InlineKeyboardButton.WithCallbackData("Beitrag löschen", ModDeleteFlaggedPrefix + postId),
-        InlineKeyboardButton.WithCallbackData("Flag entfernen", ModClearFlagPrefix + postId)
+        InlineKeyboardButton.WithCallbackData("Beitrag löschen", ModDeleteFlaggedPrefix + postId), InlineKeyboardButton.WithCallbackData("Flag entfernen", ModClearFlagPrefix + postId)
       });
     }
 
@@ -90,8 +88,7 @@ namespace DRaumServerApp.telegram
       return _getChooseInputModeKeyboard ??= new InlineKeyboardMarkup(
         new List<InlineKeyboardButton>
         {
-          InlineKeyboardButton.WithCallbackData("Beitrag schreiben", ModeWritePrefix + "0"),
-          InlineKeyboardButton.WithCallbackData("Feedback schreiben", ModeFeedbackPrefix + "0")
+          InlineKeyboardButton.WithCallbackData("Beitrag schreiben", ModeWritePrefix + "0"), InlineKeyboardButton.WithCallbackData("Feedback schreiben", ModeFeedbackPrefix + "0")
         });
     }
 
@@ -104,8 +101,7 @@ namespace DRaumServerApp.telegram
     {
       return new InlineKeyboardMarkup(new List<InlineKeyboardButton>
       {
-        InlineKeyboardButton.WithCallbackData("Veröffentlichen", ModAcceptPrefix + postId),
-        InlineKeyboardButton.WithCallbackData("Ablehnen", ModBlockPrefix + postId)
+        InlineKeyboardButton.WithCallbackData("Veröffentlichen", ModAcceptPrefix + postId), InlineKeyboardButton.WithCallbackData("Ablehnen", ModBlockPrefix + postId)
       });
     }
 

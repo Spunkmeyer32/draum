@@ -1,4 +1,5 @@
 ﻿using DRaumServerApp;
+using DRaumServerApp.Postings;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Telegram.Bot.Types;
 

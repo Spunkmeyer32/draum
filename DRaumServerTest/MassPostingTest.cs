@@ -1,6 +1,8 @@
 ﻿using System;
 using System.IO;
 using DRaumServerApp;
+using DRaumServerApp.Authors;
+using DRaumServerApp.Postings;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Newtonsoft.Json;
 
@@ -14,7 +16,7 @@ namespace DRaumServerTest
     public void checkMassPostings()
     {
       AuthorManager.Maxmanagedusers = int.MaxValue;
-      Utilities.RUNNINGINTESTMODE = true;
+      Utilities.Runningintestmode = true;
       AuthorManager authors = new AuthorManager();
       PostingManager postings = new PostingManager();
 
@@ -22,7 +24,7 @@ namespace DRaumServerTest
 
       for (int i = 0; i < 5000; i++)
       {
-        authors.getCoolDownTimer(10000+i, "autor_" + i, Author.InteractionCooldownTimer.DEFAULT);
+        authors.getCoolDownTimer(10000+i, "autor_" + i, Author.InteractionCooldownTimer.Default);
       }
 
       int authorid = 10000;
@@ -45,8 +47,9 @@ namespace DRaumServerTest
           }
         }
       }
+
       DateTime before = DateTime.Now;
-      FileStream backupfile = System.IO.File.Create("testposts.json");
+      FileStream backupfile = File.Create("testposts.json");
       StreamWriter sr = new StreamWriter(backupfile);
       sr.Write(JsonConvert.SerializeObject(postings, Formatting.Indented));
       sr.Close();
@@ -55,7 +58,7 @@ namespace DRaumServerTest
       Console.Out.WriteLine("Speichern dauerte " + durationToStore.TotalSeconds + " Sekunden.");
 
       before = DateTime.Now;
-      FileStream inputFilestream = System.IO.File.OpenRead("testposts.json");
+      FileStream inputFilestream = File.OpenRead("testposts.json");
       StreamReader sreader = new StreamReader(inputFilestream);
       string jsonstring = sreader.ReadToEnd();
       sreader.Close();

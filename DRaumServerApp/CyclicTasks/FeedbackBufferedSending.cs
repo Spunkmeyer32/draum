@@ -2,11 +2,12 @@
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using DRaumServerApp.TelegramUtilities;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.ReplyMarkups;
 
-namespace DRaumServerApp.telegram
+namespace DRaumServerApp.CyclicTasks
 {
   internal class FeedbackBufferedSending
   {
@@ -29,7 +30,7 @@ namespace DRaumServerApp.telegram
       this.feedbackSendingTask = this.periodicFeedbackSendingTask(new TimeSpan(0, 0, 0, IntervalSendFeedbackSeconds, 0), this.cancelTaskSource.Token);
     }
 
-    internal async void shutDownTask()
+    internal async Task shutDownTask()
     {
       this.cancelTaskSource.Cancel();
       try
@@ -80,8 +81,8 @@ namespace DRaumServerApp.telegram
       // erhaltene Feedbacks verarbeiten, wenn grad keine Antwort geschrieben wird
       FeedbackElement feedback = this.feedbackManager.dequeueFeedback();
       bool fail = false;
-      InlineKeyboardButton replyButton = InlineKeyboardButton.WithCallbackData("Antworten", Keyboards.ModAcceptPrefix + feedback.chatID);
-      InlineKeyboardButton dismissButton = InlineKeyboardButton.WithCallbackData("Verwerfen", Keyboards.ModBlockPrefix + feedback.chatID);
+      InlineKeyboardButton replyButton = InlineKeyboardButton.WithCallbackData("Antworten", Keyboards.ModAcceptPrefix + feedback.ChatId);
+      InlineKeyboardButton dismissButton = InlineKeyboardButton.WithCallbackData("Verwerfen", Keyboards.ModBlockPrefix + feedback.ChatId);
       List<InlineKeyboardButton> buttonlist = new List<InlineKeyboardButton>
       {
         replyButton,
@@ -92,7 +93,7 @@ namespace DRaumServerApp.telegram
       {
         Message msg = this.feedbackBot.SendTextMessageAsync(
           chatId: this.feedbackChatId,
-          text: feedback.text,
+          text: feedback.Text,
           replyMarkup: keyboard
         ).Result;
         if (msg == null || msg.MessageId == 0)
@@ -110,6 +111,7 @@ namespace DRaumServerApp.telegram
       {
         return;
       }
+
       logger.Info("Das Feedback-Element wird neu einsortiert");
       this.feedbackManager.enqueueFeedback(feedback);
     }

@@ -1,18 +1,15 @@
 ﻿using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Text;
 using System.Text.RegularExpressions;
 
-namespace DRaumServerApp
+namespace DRaumServerApp.Postings
 {
-  class SpamFilter
+  internal static class SpamFilter
   {
-    private static int minLen = 100;
-    private static int maxLen = 1000;
-    private static Regex linkParser = new Regex(@"\b(?:https?://|www\.)\S+\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly int minLen = 100;
+    private static readonly int maxLen = 1000;
+    private static readonly Regex linkParser = new Regex(@"\b(?:https?://|www\.)\S+\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
-    private static string[] badwords = { 
+    private static readonly string[] badwords = { 
       "nazischweine" ,
       "linke zecken",
       "arschloch",
@@ -27,7 +24,7 @@ namespace DRaumServerApp
       "meine ehre heißt treue",
       "meine ehre heisst treue"
     };
-    private static string[] goodwords = {
+    private static readonly string[] goodwords = {
       "nazis",
       "linke",
       "ars****ch",
@@ -44,7 +41,7 @@ namespace DRaumServerApp
     };
 
 
-    public static bool checkPostInput(String input, out String output, out String message)
+    public static bool checkPostInput(string input, out string output, out string message)
     {
       // CheckLength
       int tlen = input.Length;
@@ -76,9 +73,9 @@ namespace DRaumServerApp
       }
       message = "OK";
       bool wordflag = false;
-      for(int i=0;i<badwords.Length;i++)
+      for(int i=0;i< badwords.Length;i++)
       {
-        if(input.Contains(badwords[i],StringComparison.CurrentCultureIgnoreCase))
+        if(input.Contains(badwords[i], StringComparison.CurrentCultureIgnoreCase))
         {
           input = input.Replace(badwords[i], goodwords[i], StringComparison.CurrentCultureIgnoreCase);
           wordflag = true;

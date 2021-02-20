@@ -6,19 +6,19 @@ namespace DRaumServerApp
 {
   class FeedbackElement
   {
-    public String text { get; set; }
-    public long chatID { get; set; }
+    public String Text { get; set; }
+    public long ChatId { get; set; }
 
     public FeedbackElement()
     {
-      this.text = "";
-      this.chatID = -1;
+      this.Text = "";
+      this.ChatId = -1;
     }
 
     public FeedbackElement(string text, long id)
     {
-      this.text = text;
-      this.chatID = id;
+      this.Text = text;
+      this.ChatId = id;
     }
   }
 }

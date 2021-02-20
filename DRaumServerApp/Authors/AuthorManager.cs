@@ -1,12 +1,12 @@
-﻿using Newtonsoft.Json;
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using Telegram.Bot.Types;
-using static DRaumServerApp.Author;
+using DRaumServerApp.Postings;
+using Newtonsoft.Json;
+using static DRaumServerApp.Authors.Author;
 
-namespace DRaumServerApp
+namespace DRaumServerApp.Authors
 {
   internal class AuthorManager
   {
@@ -18,13 +18,13 @@ namespace DRaumServerApp
 
     internal AuthorManager()
     {
-      if (Utilities.RUNNINGINTESTMODE)
+      if (Utilities.Runningintestmode)
       {
-        Author.COOLDOWNMINUTES = 1;
-        Author.COOLDOWNMINUTESFLAGGING = 1;
-        Author.COOLDOWNHOURSPOSTING = 0;
-        Author.COOLDOWNHOURSFEEDBACK = 0;
-        AuthorManager.Maxmanagedusers = int.MaxValue;
+        Cooldownminutes = 1;
+        Cooldownminutesflagging = 1;
+        Cooldownhoursposting = 0;
+        Cooldownhoursfeedback = 0;
+        Maxmanagedusers = int.MaxValue;
       }
       this.authors = new ConcurrentDictionary<long, Author>();
     }
@@ -78,10 +78,7 @@ namespace DRaumServerApp
       {
         if (this.authors.Count < Maxmanagedusers)
         {
-          if (externalName == null)
-          {
-            externalName = "";
-          }
+          externalName ??= "";
           Author newAuthor = new Author(authorId, externalName);
           if (this.authors.TryAdd(authorId, newAuthor))
           {
@@ -105,16 +102,16 @@ namespace DRaumServerApp
       // alle Autoren Prüfen und Median und Top ermitteln
       int toplevel = 0;
       ArrayList levellist = new ArrayList();
-      int temp;
       foreach(Author author in this.authors.Values)
       {
-        temp = author.getLevel();
+        int temp = author.getLevel();
         levellist.Add(temp);
         if(temp > toplevel)
         {
           toplevel = temp;
         }
       }
+
       Array target = levellist.ToArray();
       Array.Sort(target);
       if(target.Length == 0)
@@ -123,6 +120,7 @@ namespace DRaumServerApp
         topOut = 0;
         return;
       }
+      // ReSharper disable once PossibleNullReferenceException
       int median = (int)target.GetValue(target.Length / 2);
       medianOut = median;
       topOut = toplevel;      
@@ -134,14 +132,14 @@ namespace DRaumServerApp
       author.setPostMode();
     }
 
-    internal PostingPublishManager.publishHourType getPublishType(long authorId, int premiumLevelCap)
+    internal PostingPublishManager.PublishHourType getPublishType(long authorId, int premiumLevelCap)
     {
       Author author = this.getAuthor(authorId);
       if(author != null)
       {
         return author.getPublishType(premiumLevelCap);
       }
-      return PostingPublishManager.publishHourType.NONE;
+      return PostingPublishManager.PublishHourType.None;
     }
 
     internal bool isPostMode(long id, string externalName)
