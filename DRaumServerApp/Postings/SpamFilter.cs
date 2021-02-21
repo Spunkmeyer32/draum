@@ -6,7 +6,7 @@ namespace DRaumServerApp.Postings
   internal static class SpamFilter
   {
     private static readonly int minLen = 100;
-    private static readonly int maxLen = 1000;
+    private static readonly int maxLen = 1500;
     private static readonly Regex linkParser = new Regex(@"\b(?:https?://|www\.)\S+\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     private static readonly string[] badwords = { 

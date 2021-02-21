@@ -80,11 +80,11 @@ namespace DRaumServerApp.Bots
         {
           TimeSpan coolDownTime =
             this.authors.getCoolDownTimer(authorid, authorname, Author.InteractionCooldownTimer.Posting);
-          string msgCoolDownText = "(Spamvermeidung) Zeit bis zum nächsten Posting: " +
+          string msgCoolDownText = "⏳ (Spamvermeidung) Zeit bis zum nächsten Posting: " +
                                    coolDownTime.TotalMinutes.ToString("0.0") + " Minute(n)";
           if (coolDownTime.TotalMinutes > 180)
           {
-            msgCoolDownText = "(Spamvermeidung) Zeit bis zum nächsten Posting: " +
+            msgCoolDownText = "⏳ (Spamvermeidung) Zeit bis zum nächsten Posting: " +
                               coolDownTime.TotalHours.ToString("0.0") + " Stunde(n)";
           }
           await this.telegramInputBot.SendTextMessageAsync(
@@ -121,11 +121,11 @@ namespace DRaumServerApp.Bots
         {
           TimeSpan coolDownTime =
             this.authors.getCoolDownTimer(authorid, authorname, Author.InteractionCooldownTimer.Feedback);
-          string msgCoolDownText = "(Spamvermeidung) Zeit bis zur nächsten Feedbackmöglichkeit: " +
+          string msgCoolDownText = "⏳ (Spamvermeidung) Zeit bis zur nächsten Feedbackmöglichkeit: " +
                                    coolDownTime.TotalMinutes.ToString("0.0") + " Minute(n)";
           if (coolDownTime.TotalMinutes > 180)
           {
-            msgCoolDownText = "(Spamvermeidung) Zeit bis zur nächsten Feedbackmöglichkeit: " +
+            msgCoolDownText = "⏳ (Spamvermeidung) Zeit bis zur nächsten Feedbackmöglichkeit: " +
                               coolDownTime.TotalHours.ToString("0.0") + " Stunde(n)";
           }
           await this.telegramInputBot.SendTextMessageAsync(

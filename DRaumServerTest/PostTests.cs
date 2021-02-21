@@ -97,11 +97,11 @@ namespace DRaumServerTest
       long postingId = kvp.Key;
       pmgr.acceptPost(postingId, PostingPublishManager.PublishHourType.Normal);
       Assert.IsFalse(pmgr.isAuthor(postingId,20));
-      Assert.IsTrue(amgr.canUserVote(postingId,20));
+      Assert.IsTrue(amgr.canUserVote(postingId,20,"hans"));
       amgr.vote(postingId,20);
       pmgr.upvote(postingId,5);
-      Assert.IsFalse( !pmgr.isAuthor(postingId,20) && amgr.canUserVote(postingId,20) );
-      Assert.IsFalse( !pmgr.isAuthor(postingId,10) && amgr.canUserVote(postingId,10) );
+      Assert.IsFalse( !pmgr.isAuthor(postingId,20) && amgr.canUserVote(postingId,20,"hans") );
+      Assert.IsFalse( !pmgr.isAuthor(postingId,10) && amgr.canUserVote(postingId,10,"hans") );
     }
 
     [TestMethod]

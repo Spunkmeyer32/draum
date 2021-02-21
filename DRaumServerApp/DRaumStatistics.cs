@@ -13,6 +13,9 @@ namespace DRaumServerApp
     [JsonIgnore]
     private readonly object interactionMutex = new object();
 
+    [JsonIgnore] 
+    private readonly object lastBackupMutex = new object();
+
     [JsonIgnore]
     private static readonly HardwareInfo hardwareInfo = new HardwareInfo();
 
@@ -26,29 +29,41 @@ namespace DRaumServerApp
     private volatile int medianWritersLevel;
     [JsonProperty]
     private volatile int topWritersLevel;
+    [JsonProperty]
+    private DateTime lastBackup;
 
     internal DRaumStatistics()
     {
       this.medianVotesPerPost = 1;
       this.medianWritersLevel = 1;
       this.topWritersLevel = 1;
+      this.lastBackup = new DateTime(1999, 1, 1, 9, 0, 0);
     }
 
     internal void updateWritersLevel(int top, int median)
     {
-      this.medianWritersLevel = median;
-      this.topWritersLevel = top;
+      this.medianWritersLevel = median > 1 ? median : 1;
+      this.topWritersLevel = top > 1 ? top : 1;
     }
 
     internal void setVotesMedian(long median)
     {
-      if (median > 1)
+      this.medianVotesPerPost = median > 1 ? median : 1;
+    }
+
+    internal void setLastBackup(DateTime timestamp)
+    {
+      lock (this.lastBackupMutex)
       {
-        this.medianVotesPerPost = median;
+        this.lastBackup = timestamp;
       }
-      else
+    }
+
+    internal DateTime getLastBackup()
+    {
+      lock (this.lastBackupMutex)
       {
-        this.medianVotesPerPost = 1;
+        return this.lastBackup;
       }
     }
 

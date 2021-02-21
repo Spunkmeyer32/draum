@@ -544,83 +544,99 @@ namespace DRaumServerApp.Postings
     internal List<long> getDailyTopPostsFromYesterday()
     {
       // Iteriere über alle Posts, filtern nach Gestern, Sortieren nach Votes, Top 3 zurück
-      DateTime yesterday = new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day, 0, 0, 0);
-      yesterday = yesterday.AddDays(-1.0);
-      List<Posting> result = new List<Posting>();
-      foreach(Posting posting in this.postings.Values)
+      try
       {
-        TimeSpan diff = posting.getPublishTimestamp() - yesterday;
-        if (diff.TotalHours >= 0.0 && diff.TotalHours <= 24.0 )
+        DateTime yesterday = new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day, 0, 0, 0);
+        yesterday = yesterday.AddDays(-1.0);
+        List<Posting> result = new List<Posting>();
+        foreach (Posting posting in this.postings.Values)
         {
-          if (posting.getUpVotePercentage() > 50)
+          TimeSpan diff = posting.getPublishTimestamp() - yesterday;
+          if (diff.TotalHours >= 0.0 && diff.TotalHours <= 24.0)
           {
-            result.Add(posting);
+            if (posting.getUpVotePercentage() > 50)
+            {
+              result.Add(posting);
+            }
           }
         }
-      }
-      if (result.Count > 3)
-      {
-        Array targetlist = result.ToArray();
-        Array.Sort(targetlist, new PostingVoteComparer());
-        List<long> resultList = new List<long>
+        if (result.Count > 3)
         {
-          ((Posting)targetlist.GetValue(0)).getPostId(),
-          ((Posting)targetlist.GetValue(1)).getPostId(),
-          ((Posting)targetlist.GetValue(2)).getPostId()
-        };
-        return resultList;
-      }
-      else
-      {
-        List<long> resultList = new List<long>();
-        foreach (Posting posting in result)
-        {
-          resultList.Add(posting.getPostId());
+          Array targetlist = result.ToArray();
+          Array.Sort(targetlist, new PostingVoteComparer());
+          List<long> resultList = new List<long>
+          {
+            ((Posting) targetlist.GetValue(0)).getPostId(),
+            ((Posting) targetlist.GetValue(1)).getPostId(),
+            ((Posting) targetlist.GetValue(2)).getPostId()
+          };
+          return resultList;
         }
-        return resultList;
+        else
+        {
+          List<long> resultList = new List<long>();
+          foreach (Posting posting in result)
+          {
+            resultList.Add(posting.getPostId());
+          }
+          return resultList;
+        }
+      }
+      catch (Exception ex)
+      {
+        logger.Error(ex,"Fehler beim Filtern nach den Top-Posts von gestern");
+        return new List<long>();
       }
     }
 
 
     internal List<long> getWeeklyTopPostsFromLastWeek()
     {
-      // Iteriere über alle Posts, filtern nach Gestern, Sortieren nach Votes, Top 3 zurück
-      DateTime lastWeek = new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day, 0, 0, 0);
-      lastWeek = lastWeek.AddDays(-7.0);
-      List<Posting> result = new List<Posting>();
-      foreach (Posting posting in this.postings.Values)
+      // Iteriere über alle Posts, filtern nach letzte Woche, Sortieren nach Votes, Top 5 zurück
+      try
       {
-        TimeSpan diff = posting.getPublishTimestamp() - lastWeek;
-        if (diff.TotalDays >= 0.0 && diff.TotalDays <= 7.0)
+        DateTime lastWeek = new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day, 0, 0, 0);
+        lastWeek = lastWeek.AddDays(-7.0);
+        List<Posting> result = new List<Posting>();
+        foreach (Posting posting in this.postings.Values)
         {
-          if (posting.getUpVotePercentage() > 50)
+          TimeSpan diff = posting.getPublishTimestamp() - lastWeek;
+          if (diff.TotalDays >= 0.0 && diff.TotalDays <= 7.0)
           {
-            result.Add(posting);
+            if (posting.getUpVotePercentage() > 50)
+            {
+              result.Add(posting);
+            }
           }
         }
-      }
-      if (result.Count > 5)
-      {
-        Array targetlist = result.ToArray();
-        Array.Sort(targetlist, new PostingVoteComparer());
-        List<long> resultList = new List<long>
+        if (result.Count > 5)
         {
-          ((Posting)targetlist.GetValue(0)).getPostId(),
-          ((Posting)targetlist.GetValue(1)).getPostId(),
-          ((Posting)targetlist.GetValue(2)).getPostId(),
-          ((Posting)targetlist.GetValue(3)).getPostId(),
-          ((Posting)targetlist.GetValue(4)).getPostId()
-        };
-        return resultList;
-      }
-      else
-      {
-        List<long> resultList = new List<long>();
-        foreach (Posting posting in result)
-        {
-          resultList.Add(posting.getPostId());
+          Array targetlist = result.ToArray();
+          Array.Sort(targetlist, new PostingVoteComparer());
+          List<long> resultList = new List<long>
+          {
+            ((Posting) targetlist.GetValue(0)).getPostId(),
+            ((Posting) targetlist.GetValue(1)).getPostId(),
+            ((Posting) targetlist.GetValue(2)).getPostId(),
+            ((Posting) targetlist.GetValue(3)).getPostId(),
+            ((Posting) targetlist.GetValue(4)).getPostId()
+          };
+          return resultList;
         }
-        return resultList;
+        else
+        {
+          List<long> resultList = new List<long>();
+          foreach (Posting posting in result)
+          {
+            resultList.Add(posting.getPostId());
+          }
+          return resultList;
+        }
+      }
+      catch (Exception ex)
+      {
+        logger.Error(ex,"Fehler beim Filtern nach den Top-Posts der letzten Woche");
+        return new List<long>();
       }
     }
 

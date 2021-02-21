@@ -9,7 +9,7 @@ using Telegram.Bot.Types.ReplyMarkups;
 
 namespace DRaumServerApp.CyclicTasks
 {
-  internal class FeedbackBufferedSending
+  internal class FeedbackSendingTask
   {
     private static readonly NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
 
@@ -22,7 +22,7 @@ namespace DRaumServerApp.CyclicTasks
     private readonly long feedbackChatId;
 
 
-    internal FeedbackBufferedSending(FeedbackManager feedbackManager, TelegramBotClient telegramBot, long feedbackchat)
+    internal FeedbackSendingTask(FeedbackManager feedbackManager, TelegramBotClient telegramBot, long feedbackchat)
     {
       this.feedbackManager = feedbackManager;
       this.feedbackBot = telegramBot;
@@ -72,7 +72,7 @@ namespace DRaumServerApp.CyclicTasks
       logger.Info("Feedback-Senden-Task ist beendet");
     }
 
-    private void processFeedback()
+    private async void processFeedback()
     {
       if (!this.feedbackManager.feedBackAvailable() || this.feedbackManager.isWaitingForFeedbackReply())
       {
@@ -81,21 +81,13 @@ namespace DRaumServerApp.CyclicTasks
       // erhaltene Feedbacks verarbeiten, wenn grad keine Antwort geschrieben wird
       FeedbackElement feedback = this.feedbackManager.dequeueFeedback();
       bool fail = false;
-      InlineKeyboardButton replyButton = InlineKeyboardButton.WithCallbackData("Antworten", Keyboards.ModAcceptPrefix + feedback.ChatId);
-      InlineKeyboardButton dismissButton = InlineKeyboardButton.WithCallbackData("Verwerfen", Keyboards.ModBlockPrefix + feedback.ChatId);
-      List<InlineKeyboardButton> buttonlist = new List<InlineKeyboardButton>
-      {
-        replyButton,
-        dismissButton
-      };
-      InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup(buttonlist);
       try
       {
-        Message msg = this.feedbackBot.SendTextMessageAsync(
+        Message msg = await this.feedbackBot.SendTextMessageAsync(
           chatId: this.feedbackChatId,
           text: feedback.Text,
-          replyMarkup: keyboard
-        ).Result;
+          replyMarkup: Keyboards.getFeedbackReplyKeyboard(feedback.ChatId)
+        );
         if (msg == null || msg.MessageId == 0)
         {
           logger.Error("Es gab ein Problem beim senden der Feedback-Nachricht");
@@ -111,7 +103,6 @@ namespace DRaumServerApp.CyclicTasks
       {
         return;
       }
-
       logger.Info("Das Feedback-Element wird neu einsortiert");
       this.feedbackManager.enqueueFeedback(feedback);
     }

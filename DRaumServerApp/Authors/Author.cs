@@ -27,10 +27,17 @@ namespace DRaumServerApp.Authors
     [JsonIgnore]
     private DateTime coolDownTimeStampFeedback;
 
+    [JsonIgnore] 
+    private readonly object credibilityMutex = new object();
+    [JsonIgnore] 
+    private readonly object votingGaugeMutex = new object();
+
     [JsonProperty]
     private long authorId;
     [JsonProperty]
     private string authorName;
+    [JsonProperty]
+    private DateTime lastActivity;
     [JsonProperty]
     private bool postmode;
     [JsonProperty]
@@ -71,6 +78,7 @@ namespace DRaumServerApp.Authors
       this.postmode = false;
       this.feedbackmode = false;
       this.coolDownTimeStamp = DateTime.Now;
+      this.lastActivity = DateTime.Now;
       this.votedPosts = new ConcurrentBag<long>();
       this.flaggedPosts = new ConcurrentBag<long>();
       this.votingGauge = 0;
@@ -89,11 +97,13 @@ namespace DRaumServerApp.Authors
     internal void vote(long postingId)
     {
       this.votedPosts.Add(postingId);
+      this.lastActivity = DateTime.Now;
     }
 
     internal void flag(long postingId)
     {
       this.flaggedPosts.Add(postingId);
+      this.lastActivity = DateTime.Now;
     }
 
     internal bool canFlag(long postId)
@@ -120,8 +130,11 @@ namespace DRaumServerApp.Authors
 
     internal void updateCredibility(long receivedUpVotes, long receivedDownVotes)
     {
-      this.downvotesReceived += receivedDownVotes;
-      this.upvotesReceived += receivedUpVotes;   
+      lock (this.credibilityMutex)
+      {
+        this.downvotesReceived += receivedDownVotes;
+        this.upvotesReceived += receivedUpVotes;
+      }
     }
 
     public int getLevel()
@@ -140,9 +153,12 @@ namespace DRaumServerApp.Authors
     internal string getShortAuthorInfo()
     {
       int percentage = 50;
-      if(this.getTotalVotes() != 0)
+      lock (this.credibilityMutex)
       {
-        percentage = (int)((this.upvotesReceived / (float)this.getTotalVotes()) * 100.0f);
+        if(this.upvotesReceived + this.downvotesReceived != 0)
+        {
+          percentage = (int) ((this.upvotesReceived / (float) this.upvotesReceived + this.downvotesReceived) * 100.0f);
+        }
       }
       return "Level " + this.getLevel() + " Schreiber/in mit " + percentage + " Prozent  Zustimmung";
     }
@@ -151,11 +167,7 @@ namespace DRaumServerApp.Authors
     {
       this.exp += _expForPosting;
       this.postCount += 1;
-    }
-
-    private long getTotalVotes()
-    {
-      return this.upvotesReceived + this.downvotesReceived;
+      this.lastActivity = DateTime.Now;
     }
 
     internal string getAuthorName()
@@ -166,6 +178,11 @@ namespace DRaumServerApp.Authors
     internal long getAuthorId()
     {
       return this.authorId;
+    }
+
+    internal DateTime getLastActivity()
+    {
+      return this.lastActivity;
     }
 
     internal void setPostMode()
@@ -255,41 +272,47 @@ namespace DRaumServerApp.Authors
 
     internal int voteUpAndGetCount()
     {
-      this.exp += _expForVote;
-      if (this.votingGauge <= 0)
+      lock (votingGaugeMutex)
       {
-        this.votingGauge += 1;
-        return 10;
-      }
-      else
-      {
-        int result = Math.Max(10 - (this.votingGauge / 2), 5);
-        this.votingGauge += 1;
-        if (this.votingGauge > 10)
+        this.exp += _expForVote;
+        if (this.votingGauge <= 0)
         {
-          this.votingGauge = 10;
+          this.votingGauge += 1;
+          return 10;
         }
-        return result;
+        else
+        {
+          int result = Math.Max(10 - (this.votingGauge / 2), 5);
+          this.votingGauge += 1;
+          if (this.votingGauge > 10)
+          {
+            this.votingGauge = 10;
+          }
+          return result;
+        }
       }
     }
 
     internal int voteDownAndGetCount()
     {
-      this.exp += _expForVote;
-      if (this.votingGauge >= 0)
+      lock (votingGaugeMutex)
       {
-        this.votingGauge -= 1;
-        return 10;
-      }
-      else
-      {
-        int result = Math.Max(10 + (this.votingGauge), 1);
-        this.votingGauge -= 1;
-        if (this.votingGauge < -10)
+        this.exp += _expForVote;
+        if (this.votingGauge >= 0)
         {
-          this.votingGauge = -10;
+          this.votingGauge -= 1;
+          return 10;
         }
-        return result;
+        else
+        {
+          int result = Math.Max(10 + (this.votingGauge), 1);
+          this.votingGauge -= 1;
+          if (this.votingGauge < -10)
+          {
+            this.votingGauge = -10;
+          }
+          return result;
+        }
       }
     }
 

@@ -13,11 +13,12 @@ namespace DRaumServerApp
     private readonly object dataMutexFeedback = new object();
     [JsonIgnore]
     private int moderateMessageId = -1;
-    [JsonIgnore]
-    private int adminStatisticMessageId = -1;
+  
+
+    
 
     [JsonProperty]
-    private ConcurrentQueue<FeedbackElement> feedBacks;
+    private ConcurrentQueue<FeedbackElement> feedbacks;
     [JsonProperty]
     private bool waitForModeratedText;
     [JsonProperty]
@@ -31,7 +32,7 @@ namespace DRaumServerApp
 
     internal FeedbackManager()
     {
-      this.feedBacks = new ConcurrentQueue<FeedbackElement>();
+      this.feedbacks = new ConcurrentQueue<FeedbackElement>();
       lock (this.dataMutex)
       {
         this.waitForDenyText = false;
@@ -42,19 +43,19 @@ namespace DRaumServerApp
 
     internal void enqueueFeedback(FeedbackElement feedback)
     {
-      this.feedBacks.Enqueue(feedback);
+      this.feedbacks.Enqueue(feedback);
     }
 
     internal FeedbackElement dequeueFeedback()
     {
       FeedbackElement result = new FeedbackElement();
-      this.feedBacks.TryDequeue(out result);
+      this.feedbacks.TryDequeue(out result);
       return result;
     }
 
     internal bool feedBackAvailable()
     {
-      return (this.feedBacks.Count != 0);
+      return (this.feedbacks.Count != 0);
     }
 
     internal int getModerateMessageId()
@@ -66,17 +67,7 @@ namespace DRaumServerApp
     {
       this.moderateMessageId = messageId;
     }
-
-    internal int getAdminStatisticMessageId()
-    {
-      return this.adminStatisticMessageId;
-    }
-
-    internal void setAdminStatisticMessageId(int messageId)
-    {
-      this.adminStatisticMessageId = messageId;
-    }
-
+    
     internal void waitForModerationText(long id)
     {
       lock (this.dataMutex)

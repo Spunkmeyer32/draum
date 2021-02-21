@@ -93,6 +93,20 @@ namespace DRaumServerApp.TelegramUtilities
     }
 
     /// <summary>
+    /// [ Antworten ] [ Verwerfen ]
+    /// </summary>
+    /// <param name="chatId"></param>
+    /// <returns></returns>
+    internal static InlineKeyboardMarkup getFeedbackReplyKeyboard(long chatId)
+    {
+      return new InlineKeyboardMarkup(new List<InlineKeyboardButton>
+      {
+        InlineKeyboardButton.WithCallbackData("Antworten", Keyboards.ModAcceptPrefix + chatId),
+        InlineKeyboardButton.WithCallbackData("Verwerfen", Keyboards.ModBlockPrefix + chatId)
+      });
+    }
+
+    /// <summary>
     /// [ Veröffentlichen ] [ Ablehnen ]
     /// </summary>
     /// <param name="postId">PostID des moderierten Posts, welches der User veröffentlichen oder ablehnen kann</param>

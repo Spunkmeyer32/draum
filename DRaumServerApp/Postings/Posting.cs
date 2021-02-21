@@ -130,7 +130,6 @@ namespace DRaumServerApp.Postings
       }
     }
 
-
     internal void updateText(string text, bool dontSetDirtyFlag)
     {
       lock (this.textMutex)

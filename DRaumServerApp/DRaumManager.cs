@@ -5,11 +5,11 @@ using Telegram.Bot.Args;
 using System.Configuration;
 using Newtonsoft.Json;
 using System.IO;
-using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Threading;
+using DRaumServerApp.CyclicTasks;
+using DRaumServerApp.TelegramUtilities;
 using Telegram.Bot.Types;
-using Telegram.Bot.Exceptions;
 using Telegram.Bot.Types.Enums;
 
 /*
@@ -64,9 +64,12 @@ namespace DRaumServerApp
     private Postings.PostingManager posts;
     private DRaumStatistics statistics;
     private FeedbackManager feedbackManager;
+    private PostingTextBuilder textBuilder;
 
-    private CyclicTasks.FeedbackBufferedSending feedbackBufferedSending;
-    private CyclicTasks.PublishingTaskManager publishingTaskManager;
+    private CyclicTasks.FeedbackSendingTask feedbackSendingTask;
+    private CyclicTasks.PublishingTask publishingTask;
+    private CyclicTasks.VoteAndFlagTask voteAndFlagTask;
+    private CyclicTasks.StatisticCollectionTask statisticCollectionTask;
 
     // Telegram Bots
     private TelegramBotClient telegramInputBot;
@@ -86,16 +89,10 @@ namespace DRaumServerApp
     private readonly long draumDailyChatId;
     private readonly long draumWeeklyChatId;
 
-    private string adminStatisticText = "";
-    private readonly HashSet<long> flaggedPostsSent = new HashSet<long>();
-
-    private DateTime lastBackup = new DateTime(1999, 1, 1, 9, 0, 0);
-
-
+    
     private Task backupTask;
-    private Task votingFlaggingTask;
     private Task postAndFeedbackCheckingTask;
-    private Task statisticCollectTask;
+
 
     private string startupinfo = "Keine Info";
 
@@ -116,19 +113,18 @@ namespace DRaumServerApp
     // Tasks und Intervalle für das regelmäßige Abarbeiten von Aufgaben
     
     private static readonly int intervalBackUpDataMinutes = 60;
-    private static readonly int intervalVoteAndFlagCountMinutes = 5;
     private static readonly int intervalpostcheckMilliseconds = 500;
-    private static readonly int intervalStatisticCollectionMinutes = 60;
+
 
     // Vorgefertigte Texte
     internal static readonly string PostIntro = "Schreib-Modus!\r\n\r\nDie nächste Eingabe von Ihnen wird als Posting interpretiert. " +
-                                                "Folgende Anforderungen sind zu erfüllen: \r\n\r\n▫️Textlänge zwischen 100 und 1000\r\n▫️Keine URLs\r\n▫️Keine Schimpfworte und " +
+                                                "Folgende Anforderungen sind zu erfüllen: \r\n\r\n▫️Textlänge zwischen 100 und 1500\r\n▫️Keine URLs\r\n▫️Keine Schimpfworte und " +
                                                 "ähnliches\r\n▫️Der Text muss sich im Rahmen der Gesetze bewegen\r\n▫️Keine Urheberrechtsverletzungen\r\n\r\nDer Text wird dann maschinell und ggf. durch " +
                                                 "Menschen gegengelesen und wird bei eventuellen Anpassungen in diesem Chat zur Bestätigung durch Sie nochmal abgebildet. " +
                                                 "Das Posting wird anonym veröffentlicht. Ihre User-ID wird intern gespeichert.";
 
     internal static readonly string FeedbackIntro = "Feedback-Modus!\r\n\r\nDie nächste Eingabe von Ihnen wird als Feedback für Moderatoren und Kanalbetreiber weitergeleitet. " +
-                                                    "Folgende Anforderungen sind zu erfüllen: \r\n\r\n▫️Textlänge zwischen 100 und 1000\r\n▫️Keine URLs\r\n▫️Keine Schimpfworte und " +
+                                                    "Folgende Anforderungen sind zu erfüllen: \r\n\r\n▫️Textlänge zwischen 100 und 1500\r\n▫️Keine URLs\r\n▫️Keine Schimpfworte und " +
                                                     "ähnliches.\r\n\r\nIhre User-ID wird für eine eventuelle Rückmeldung gespeichert.";
 
     internal static readonly string NoModeChosen = "Willkommen beim D-Raum-Input-Bot 🤖.\r\n\r\nEs ist zur Zeit kein Modus gewählt! Mit /" + Writecommand + " schaltet man in den Beitrag-Schreiben-Modus. Mit /" + Feedbackcommand + " kann man in den Feedback-Modus gelangen und den Moderatoren und Kanalbetreibern eine Nachricht "+
@@ -180,6 +176,8 @@ namespace DRaumServerApp
       {
         this.startupinfo = "Server ist gestartet";
       }
+
+      this.textBuilder = new PostingTextBuilder(this.posts, this.authors);
 
       this.startupinfo += "\r\nMaximale Autorenzahl:" + Authors.AuthorManager.Maxmanagedusers;
     }
@@ -253,63 +251,21 @@ namespace DRaumServerApp
       this.telegramAdminBot.OnReceiveGeneralError += this.onReceiveGeneralError;
       this.telegramAdminBot.StartReceiving(receivefilterCallbackOnly);
 
-      this.feedbackBufferedSending = new CyclicTasks.FeedbackBufferedSending(this.feedbackManager, this.telegramFeedbackBot, this.feedbackChatId);
-      this.publishingTaskManager = new CyclicTasks.PublishingTaskManager(this.telegramPublishBot, this.draumChatId, this.posts,this.draumDailyChatId,this.draumWeeklyChatId,this.authors);
-
       logger.Info("Starte periodische Aufgaben");
+      this.feedbackSendingTask = new CyclicTasks.FeedbackSendingTask(this.feedbackManager, this.telegramFeedbackBot, this.feedbackChatId);
+      this.publishingTask = new CyclicTasks.PublishingTask(this.telegramPublishBot, this.draumChatId, this.posts,this.draumDailyChatId,this.draumWeeklyChatId, this.textBuilder);
+      this.voteAndFlagTask = new CyclicTasks.VoteAndFlagTask(this.posts, this.draumChatId, this.textBuilder,this.telegramPublishBot,this.statistics, this.adminChatId, this.adminBot);
+      this.statisticCollectionTask = new StatisticCollectionTask(this.authors,this.statistics,this.posts,this.adminBot,this.adminChatId);
+      
       this.backupTask = this.periodicBackupTask(new TimeSpan(0, intervalBackUpDataMinutes, 0), this.cancelTasksSource.Token);
-      this.votingFlaggingTask = this.periodicVotingFlaggingTask(new TimeSpan(0, intervalVoteAndFlagCountMinutes, 0), this.cancelTasksSource.Token);
       this.postAndFeedbackCheckingTask = this.periodicInputCheckTask(new TimeSpan(0, 0, 0, 0, intervalpostcheckMilliseconds), this.cancelTasksSource.Token);
-      this.statisticCollectTask = this.periodicStatisticCollectTask(new TimeSpan(0, intervalStatisticCollectionMinutes, 0), this.cancelTasksSource.Token);
+      
     }
 
 
     // ==  Running Tasks
-    private async Task periodicVotingFlaggingTask(TimeSpan interval, CancellationToken cancellationToken)
-    {
-      logger.Info("Voting-Flagging-Task ist gestartet");
-      while (true)
-      {
-        try
-        {
-          await Task.Delay(interval, cancellationToken);
-        }
-        catch (OperationCanceledException)
-        {
-          break;
-        }
-        if (cancellationToken.IsCancellationRequested)
-        {
-          break;
-        }
-        this.voteFlagTask(cancellationToken);
-      }
+  
 
-      logger.Info("Voting-Flagging-Task ist beendet");
-    }
-
-    private async Task periodicStatisticCollectTask(TimeSpan interval, CancellationToken cancellationToken)
-    {
-      logger.Info("Statistik-Task ist gestartet");
-      while (true)
-      {
-        try
-        {
-          await Task.Delay(interval, cancellationToken);
-        }
-        catch (OperationCanceledException)
-        {
-          break;
-        }
-        if (cancellationToken.IsCancellationRequested)
-        {
-          break;
-        }
-        this.statisticCollectionTask();
-      }
-
-      logger.Info("Statistik-Task ist beendet");
-    }
 
     private async Task periodicInputCheckTask(TimeSpan interval, CancellationToken cancellationToken)
     {
@@ -359,23 +315,7 @@ namespace DRaumServerApp
 
 
     // ==  Task Methods
-    private void statisticCollectionTask()
-    {
-      try
-      {
-        this.statistics.switchInteractionInterval();
-        this.checkAndUpdateAdminStatistic();
-        this.authors.getMedianAndTopLevel(out var median, out var top);
-        this.statistics.updateWritersLevel(top,median);
-        long medianVotes = this.posts.getMedianVotes();
-        this.statistics.setVotesMedian(medianVotes);
-        logger.Info("Statisktik ist nun aktualisiert");
-      }
-      catch(Exception e)
-      {
-        logger.Error(e, "Fehler beim Verarbeiten der Statistik");
-      }
-    }
+
 
     private void inputCheckTask()
     {
@@ -419,107 +359,7 @@ namespace DRaumServerApp
         }
       }
     }
-
-    private async void voteFlagTask(CancellationToken cancellationToken)
-    {
-      // Posts prüfen, ob Buttons im Chat angepasst werden müssen
-      IEnumerable<long> dirtyposts = this.posts.getDirtyPosts();
-      foreach (long postId in dirtyposts)
-      {
-        logger.Info("Buttons eines Posts (" + postId + ") werden aktualisiert");
-        try
-        {
-          Message msg = await this.telegramPublishBot.EditMessageReplyMarkupAsync(
-            chatId: this.draumChatId,
-            messageId: this.posts.getMessageId(postId),
-            replyMarkup: TelegramUtilities.Keyboards.getPostKeyboard(this.posts.getUpVotes(postId), this.posts.getDownVotes(postId), postId));
-          this.posts.resetDirtyFlag(postId);
-          try
-          {
-            await Task.Delay(3000, cancellationToken);
-          }
-          catch (OperationCanceledException)
-          {
-            return;
-          }
-          if (cancellationToken.IsCancellationRequested)
-          {
-            return;
-          }
-        }
-        catch (Exception ex)
-        {
-          if (ex is MessageIsNotModifiedException)
-          {
-            this.posts.resetDirtyFlag(postId);
-            logger.Warn("Die Buttons des Posts " + postId + " waren nicht verändert");
-          }
-          else
-          {
-            logger.Error(ex, "Beim aktualisieren eines Buttons eines Beitrags (" + postId + ") trat ein Fehler auf.");
-          }
-        }
-      }
-
-      // Posts prüfen, ob Texte im Chat angepasst werden müssen
-      dirtyposts = this.posts.getTextDirtyPosts();
-      foreach (long postId in dirtyposts)
-      {
-        logger.Info("Text eines Posts ("+postId+") wird aktualisiert");
-        await this.publishingTaskManager.updatePostText(postId);
-        try
-        {
-          await Task.Delay(3000, cancellationToken);
-        }
-        catch (OperationCanceledException)
-        {
-          return;
-        }
-        if (cancellationToken.IsCancellationRequested)
-        {
-          return;
-        }
-      }
-
-
-
-      // Prüfen, ob ein Flag vorliegt und dem Admin melden
-      IEnumerable<long> flaggedPosts = this.posts.getFlaggedPosts();
-      HashSet<long> flaggedSentOld = new HashSet<long>();
-      foreach (long postId in this.flaggedPostsSent)
-      {
-        flaggedSentOld.Add(postId);
-      }
-      this.flaggedPostsSent.Clear();
-      foreach (long postId in flaggedPosts)
-      {
-        if (!flaggedSentOld.Contains(postId))
-        {
-          // getText and send to Admin
-          string msgText = "Dieser Post wurde " + this.posts.getFlagCountOfPost(postId) + "-Mal geflaggt!!! \r\n" + this.posts.getPostingText(postId);
-          Message msg = await this.adminBot.sendMessageWithKeyboard(this.adminChatId, msgText, TelegramUtilities.Keyboards.getFlaggedPostModKeyboard(postId));
-          if (msg == null)
-          {
-            logger.Error("Beim senden eines geflaggten Beitrags trat ein Fehler auf.");
-          }
-          else
-          {
-            this.flaggedPostsSent.Add(postId);
-          }
-        }
-        else
-        {
-          this.flaggedPostsSent.Add(postId);
-        }
-      }
-
-      // Fehlermeldungen an den Admin
-      await this.adminBot.handleErrorMemory(this.adminChatId, cancellationToken);
-
-
-      // Update the Status of top-posts
-      this.posts.updateTopPostStatus(this.statistics);
-    }
+    
     
     private async Task backUpTask()
     {
@@ -543,8 +383,7 @@ namespace DRaumServerApp
         this.telegramFeedbackBot.StartReceiving(receivefilterCallbackAndMessage);
         SyncManager.unhalt();
         logger.Info("Backup erledigt, weitermachen");
-        this.lastBackup = DateTime.Now;
-        this.checkAndUpdateAdminStatistic();
+        this.statistics.setLastBackup(DateTime.Now);
       }
       catch(Exception e)
       {
@@ -554,7 +393,7 @@ namespace DRaumServerApp
 
     
 
-    // == Persistancy
+    // == Persistency
     private bool loadDataFromFiles()
     {
       // Suche im Backup-Ordner nach dem neuesten Satz backupdateien
@@ -694,12 +533,12 @@ namespace DRaumServerApp
       this.cancelTasksSource.Cancel();
       try
       {
-        await this.feedbackBufferedSending.shutDownTask();
-        await this.publishingTaskManager.shutDownTask();
+        await this.feedbackSendingTask.shutDownTask();
+        await this.publishingTask.shutDownTask();
+        await this.voteAndFlagTask.shutDownTask();
+        await this.statisticCollectionTask.shutDownTask();
         await this.backupTask;
         await this.postAndFeedbackCheckingTask;
-        await this.votingFlaggingTask;
-        await this.statisticCollectTask;
       }
       catch (OperationCanceledException e)
       {
@@ -731,36 +570,9 @@ namespace DRaumServerApp
       logger.Error("Telegram.Bots .NET received a general Exception: " + e.Exception.Message);
     }
 
-    private async void checkAndUpdateAdminStatistic()
-    {
-      string newtext = "Interaktionen im letzten Intervall: " + this.statistics.getLastInteractionIntervalCount()+"\r\n";
-      newtext += "Letztes Backup: " + this.lastBackup.ToString(Utilities.UsedCultureInfo)+"\r\n";
-      newtext += "Hardware-Information: " + this.statistics.getHardwareInfo();
-      if (!newtext.Equals(this.adminStatisticText))
-      {
-        this.adminStatisticText = newtext;
-        int msgId = this.feedbackManager.getAdminStatisticMessageId();
-        if (msgId == -1)
-        {
-          Message msg = await this.adminBot.sendMessage(this.adminChatId, this.adminStatisticText);
-          if (msg == null)
-          {
-            this.feedbackManager.setAdminStatisticMessageId(-1);
-            logger.Error("Fehler beim Senden der Statistiknachricht an den Admin");
-          }
-          else
-          {
-            this.feedbackManager.setAdminStatisticMessageId(msg.MessageId);
-          }
-        }
-        else
-        {
-          await this.adminBot.editMessage(this.adminChatId, msgId, this.adminStatisticText);
-        }
-      }
-    }
+    
 
-    private bool canUserVote(long postingId, long authorId)
+    private bool canUserVote(long postingId, long authorId, string authorName)
     {
       // Wenn der Nutzer Autor ist, kann er nicht voten
       if (!Utilities.Runningintestmode)
@@ -770,10 +582,10 @@ namespace DRaumServerApp
           return false;
         }
       }
-      return this.authors.canUserVote(postingId, authorId);
+      return this.authors.canUserVote(postingId, authorId, authorName);
     }
 
-    private bool canUserFlag(long postingId, long authorId)
+    private bool canUserFlag(long postingId, long authorId, string authorName)
     {
       // Wenn der Nutzer Autor ist, kann er nicht voten
       if (!Utilities.Runningintestmode)
@@ -783,7 +595,7 @@ namespace DRaumServerApp
           return false;
         }
       }
-      return this.authors.canUserFlag(postingId, authorId);
+      return this.authors.canUserFlag(postingId, authorId,authorName);
     }
 
     private void upvote(long postingId, long authorId, int voteCount)
@@ -1086,7 +898,7 @@ namespace DRaumServerApp
           {
             // UPVOTE
             string responseText = "Stimme bereits abgegeben oder eigener Post";
-            if (this.canUserVote(callbackData.getId(), e.CallbackQuery.From.Id))
+            if (this.canUserVote(callbackData.getId(), e.CallbackQuery.From.Id, e.CallbackQuery.From.Username))
             {
               int votecount = this.authors.voteUpAndGetCount(e.CallbackQuery.From.Id, e.CallbackQuery.From.Username);
               if (votecount != 0)
@@ -1112,7 +924,7 @@ namespace DRaumServerApp
           {
             // DOWNVOTE
             string responseText = "Stimme bereits abgegeben oder eigener Post";
-            if (this.canUserVote(callbackData.getId(), e.CallbackQuery.From.Id))
+            if (this.canUserVote(callbackData.getId(), e.CallbackQuery.From.Id, e.CallbackQuery.From.Username))
             {
               int votecount = this.authors.voteDownAndGetCount(e.CallbackQuery.From.Id, e.CallbackQuery.From.Username);
               if (votecount != 0)
@@ -1156,7 +968,7 @@ namespace DRaumServerApp
               return;
             }
             string responseText = "Beitrag bereits markiert oder eigener Post";
-            if (this.canUserFlag(callbackData.getId(), e.CallbackQuery.From.Id))
+            if (this.canUserFlag(callbackData.getId(), e.CallbackQuery.From.Id, e.CallbackQuery.From.Username))
             {
               this.statistics.increaseInteraction();
               this.authors.resetCoolDown(e.CallbackQuery.From.Id, e.CallbackQuery.From.Username, Authors.Author.InteractionCooldownTimer.Flagging);
