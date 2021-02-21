@@ -1,4 +1,4 @@
-﻿namespace DRaumServerApp.telegram
+﻿namespace DRaumServerApp.TelegramUtilities
 {
   internal class DRaumCallbackData
   {

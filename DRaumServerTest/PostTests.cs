@@ -3,6 +3,8 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using System.Collections.Generic;
 using System.Threading;
+using DRaumServerApp.Authors;
+using DRaumServerApp.Postings;
 
 namespace DRaumServerTest
 {
@@ -41,7 +43,7 @@ namespace DRaumServerTest
         if(pair.Key!=-1)
         {
           count++;
-          String res = pmgr.acceptPost(pair.Key, PostingPublishManager.publishHourType.NORMAL);
+          string res = pmgr.acceptPost(pair.Key, PostingPublishManager.PublishHourType.Normal);
           Assert.IsTrue(res.StartsWith("Veröffentlichung"));
           pmgr.testPublishing(pair.Key, DateTime.Now.AddHours(-24));
           for (int i = 0; i < count * 3;i++)
@@ -57,6 +59,7 @@ namespace DRaumServerTest
           }
         }
       } while (pair.Key != -1);
+
       Assert.AreEqual(numposts, count);
       List<long> list = pmgr.getDailyTopPostsFromYesterday();
       bool found10 = false;
@@ -77,6 +80,7 @@ namespace DRaumServerTest
           found08 = true;
         }
       }
+
       Assert.IsTrue(found10 && found09 && found08);
     }
 
@@ -85,19 +89,19 @@ namespace DRaumServerTest
     {
       PostingManager pmgr = new PostingManager();
       AuthorManager amgr = new AuthorManager();
-      Utilities.RUNNINGINTESTMODE = false;
+      Utilities.Runningintestmode = false;
       amgr.setPostMode(10,"user1");
       amgr.setPostMode(20, "user2");
       pmgr.addPosting("testpost", 10);
       KeyValuePair<long, string> kvp = pmgr.getNextPostToCheck();
       long postingId = kvp.Key;
-      pmgr.acceptPost(postingId, PostingPublishManager.publishHourType.NORMAL);
+      pmgr.acceptPost(postingId, PostingPublishManager.PublishHourType.Normal);
       Assert.IsFalse(pmgr.isAuthor(postingId,20));
-      Assert.IsTrue(amgr.canUserVote(postingId,20));
+      Assert.IsTrue(amgr.canUserVote(postingId,20,"hans"));
       amgr.vote(postingId,20);
       pmgr.upvote(postingId,5);
-      Assert.IsFalse( !pmgr.isAuthor(postingId,20) && amgr.canUserVote(postingId,20) );
-      Assert.IsFalse( !pmgr.isAuthor(postingId,10) && amgr.canUserVote(postingId,10) );
+      Assert.IsFalse( !pmgr.isAuthor(postingId,20) && amgr.canUserVote(postingId,20,"hans") );
+      Assert.IsFalse( !pmgr.isAuthor(postingId,10) && amgr.canUserVote(postingId,10,"hans") );
     }
 
     [TestMethod]
@@ -111,7 +115,7 @@ namespace DRaumServerTest
         int toProcess = numThreads;
         int waitForAll = 0;
         Posting posting = new Posting(33, "TestPost", 192923);
-        posting.setChatMessageID(20);
+        posting.setChatMessageId(20);
         for (int i = 0; i < numThreads; i++)
         {
           new Thread(delegate ()
@@ -122,7 +126,7 @@ namespace DRaumServerTest
             }
             // Threads laufen bis hier hin, warten dann auf das Signal des letzten Threads
             startEvent.WaitOne();
-            this.processMTTest(ref posting);
+            this.processMtTest(ref posting);
             if (Interlocked.Decrement(ref toProcess) == 0)
             { 
               resetEvent.Set();
@@ -138,11 +142,11 @@ namespace DRaumServerTest
       }      
     }
 
-    private void processMTTest(ref Posting posting)
+    private void processMtTest(ref Posting posting)
     {
       posting.voteup(5);
       Thread.Sleep(10);
-      Assert.AreEqual(20, posting.getChatMessageID());
+      Assert.AreEqual(20, posting.getChatMessageId());
       Thread.Sleep(10);
       posting.setPublishTimestamp(DateTime.Now);
       Thread.Sleep(10);

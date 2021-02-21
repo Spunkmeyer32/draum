@@ -1,4 +1,6 @@
 ﻿using DRaumServerApp;
+using DRaumServerApp.Authors;
+using DRaumServerApp.Postings;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace DRaumServerTest
@@ -67,30 +69,33 @@ namespace DRaumServerTest
       Assert.AreEqual("testuser", author.getAuthorName());
       Assert.AreEqual(10, author.getAuthorId());
       Assert.AreEqual(1,author.getLevel());
-      Assert.AreEqual(PostingPublishManager.publishHourType.HAPPY, author.getPublishType(10));
+      Assert.AreEqual(PostingPublishManager.PublishHourType.Happy, author.getPublishType(10));
       author.publishedSuccessfully();
       author.publishedSuccessfully();
       author.publishedSuccessfully();
-      Assert.AreEqual(PostingPublishManager.publishHourType.NORMAL, author.getPublishType(10));
+      Assert.AreEqual(PostingPublishManager.PublishHourType.Normal, author.getPublishType(10));
       author.publishedSuccessfully();
       author.publishedSuccessfully();
       author.publishedSuccessfully();
       Assert.AreEqual(4,author.getLevel());
-      Assert.AreEqual(PostingPublishManager.publishHourType.PREMIUM, author.getPublishType(3));
+      Assert.AreEqual(PostingPublishManager.PublishHourType.Premium, author.getPublishType(3));
       for (long i = 0; i < 20000; i++)
       {
         author.publishedSuccessfully();
       }
+
       Assert.AreEqual(268,author.getLevel());
       for (long i = 0; i < 50000; i++)
       {
         author.publishedSuccessfully();
       }
+
       Assert.AreEqual(500,author.getLevel());
       for (long i = 0; i < 10000; i++)
       {
         author.publishedSuccessfully();
       }
+
       Assert.AreEqual(500,author.getLevel());
 
     }
@@ -105,15 +110,15 @@ namespace DRaumServerTest
       Assert.AreEqual(0, median);
       Assert.AreEqual(0, top);
 
-      atm.isCoolDownOver(10, "testuser1", Author.InteractionCooldownTimer.DEFAULT);
+      atm.isCoolDownOver(10, "testuser1", Author.InteractionCooldownTimer.Default);
       atm.getMedianAndTopLevel(out median, out top);
       Assert.AreEqual(1, median);
       Assert.AreEqual(1, top);
 
-      atm.isCoolDownOver(20, "testuser2", Author.InteractionCooldownTimer.DEFAULT);
-      atm.isCoolDownOver(30, "testuser3", Author.InteractionCooldownTimer.DEFAULT);
-      atm.isCoolDownOver(40, "testuser4", Author.InteractionCooldownTimer.DEFAULT);
-      atm.isCoolDownOver(50, "testuser5", Author.InteractionCooldownTimer.DEFAULT);
+      atm.isCoolDownOver(20, "testuser2", Author.InteractionCooldownTimer.Default);
+      atm.isCoolDownOver(30, "testuser3", Author.InteractionCooldownTimer.Default);
+      atm.isCoolDownOver(40, "testuser4", Author.InteractionCooldownTimer.Default);
+      atm.isCoolDownOver(50, "testuser5", Author.InteractionCooldownTimer.Default);
       atm.getMedianAndTopLevel(out median, out top);
       Assert.AreEqual(1, median);
       Assert.AreEqual(1, top);
@@ -149,9 +154,10 @@ namespace DRaumServerTest
       AuthorManager.Maxmanagedusers = 20;
       for(int i=0;i<AuthorManager.Maxmanagedusers;i++)
       {
-        am.getCoolDownTimer(i * 10 + 1, "user" + i, Author.InteractionCooldownTimer.DEFAULT);
+        am.getCoolDownTimer(i * 10 + 1, "user" + i, Author.InteractionCooldownTimer.Default);
       }
-      Assert.ThrowsException<DRaumException>(() => { am.getCoolDownTimer(5000, "toomuch", Author.InteractionCooldownTimer.DEFAULT); });
+
+      Assert.ThrowsException<DRaumException>(() => { am.getCoolDownTimer(5000, "toomuch", Author.InteractionCooldownTimer.Default); });
     }
   }
 }

@@ -4,7 +4,7 @@ using System.Timers;
 
 namespace DRaumServerApp
 {
-  internal class Program
+  internal static class Program
   {
 
     private static readonly System.Timers.Timer timer = new System.Timers.Timer(1000) { AutoReset = true };
@@ -32,21 +32,21 @@ namespace DRaumServerApp
         logger.Info("D-Raum-Server läuft");
         timer.Elapsed += Timer_Elapsed;
         timer.Start();
-        Console.CancelKeyPress += delegate (object sender, ConsoleCancelEventArgs e)
+        Console.CancelKeyPress += async delegate (object sender, ConsoleCancelEventArgs e)
         {
           _sigintRec = true;
           e.Cancel = true;
           logger.Info("D-Raum-Server endet (SIGINT)");
-          dRaumManager.shutDown();
+          await dRaumManager.shutDown();
           _stopApp = true;
           logger.Info("D-Raum-Server ist beendet");
         };
-        AppDomain.CurrentDomain.ProcessExit += (sender, eargs) =>
+        AppDomain.CurrentDomain.ProcessExit += async (sender, eargs) =>
         {
           if (!_sigintRec)
           {
             logger.Info("D-Raum-Server endet (SIGTERM)");
-            dRaumManager.shutDown();
+            await dRaumManager.shutDown();
             _stopApp = true;
             logger.Info("D-Raum-Server ist beendet");
           }

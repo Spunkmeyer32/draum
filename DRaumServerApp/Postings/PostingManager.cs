@@ -1,37 +1,11 @@
-﻿using Newtonsoft.Json;
-using NLog.Targets;
-using System;
-using System.Collections;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Runtime.CompilerServices;
+using JetBrains.Annotations;
+using Newtonsoft.Json;
 
-namespace DRaumServerApp
+namespace DRaumServerApp.Postings
 {
-  public class PostingVoteComparer : IComparer
-  {
-    public int Compare(object x, object y)
-    {
-      if (x == null && y == null)
-      {
-        return 0;
-      }
-      if (x == null)
-      {
-        return -1;
-      }
-      if (y == null)
-      {
-        return 1;
-      }
-      if (((Posting)y).getVoteCount() < ((Posting)x).getVoteCount())
-      {
-        return -1;
-      }
-      return ((Posting)y).getVoteCount() > ((Posting)x).getVoteCount() ? 1 : 0;
-    }
-  }
-
   internal class PostingManager
   {
     [JsonIgnore]
@@ -58,9 +32,9 @@ namespace DRaumServerApp
 
     internal PostingManager()
     {
-      if (Utilities.RUNNINGINTESTMODE)
+      if (Utilities.Runningintestmode)
       {
-        Posting.DAYSUNTILDELETENORMAL = 2;
+        Posting.Daysuntildeletenormal = 2;
       }
       this.lastPostingId = 1;
       this.postings = new ConcurrentDictionary<long, Posting>();
@@ -70,6 +44,16 @@ namespace DRaumServerApp
       this.postingsToPublishHappyHour = new ConcurrentQueue<long>();
       this.postingsToPublishPremiumHour = new ConcurrentQueue<long>();
       this.publishManager.calcNextSlot();
+    }
+
+    internal void transferFromInCheckToToCheck()
+    {
+      foreach (KeyValuePair<long, Posting> kvp in this.postingsInCheck)
+      {
+        this.postingsToCheck.Enqueue(kvp.Value);
+        this.postsCheckChangeFlag = true;
+      }
+      this.postingsInCheck.Clear();
     }
 
     internal void addPosting(string text, long authorId)
@@ -88,25 +72,23 @@ namespace DRaumServerApp
       {
         switch (this.publishManager.getCurrentpublishType())
         {
-          case PostingPublishManager.publishHourType.NORMAL:
+          case PostingPublishManager.PublishHourType.Normal:
             if (this.postingsToPublish.TryDequeue(out postId))
             {
               postToPublish = this.postings[postId];
             }
             break;
-          case PostingPublishManager.publishHourType.HAPPY:
+          case PostingPublishManager.PublishHourType.Happy:
             if (this.postingsToPublishHappyHour.TryDequeue(out postId))
             {
               postToPublish = this.postings[postId];
             }
             break;
-          case PostingPublishManager.publishHourType.PREMIUM:
+          case PostingPublishManager.PublishHourType.Premium:
             if (this.postingsToPublishPremiumHour.TryDequeue(out postId))
             {
               postToPublish = this.postings[postId];
             }
-            break;
-          default:
             break;
         }
       }
@@ -133,7 +115,8 @@ namespace DRaumServerApp
       }
     }
 
-    internal string acceptPost(long postingId, PostingPublishManager.publishHourType publishType)
+    [NotNull]
+    internal string acceptPost(long postingId, PostingPublishManager.PublishHourType publishType)
     {
       if (!this.postingsInCheck.ContainsKey(postingId))
       {
@@ -141,45 +124,45 @@ namespace DRaumServerApp
       }
       Posting postingToAccept = this.postingsInCheck[postingId];
       // Aus der einen Liste entfernen und in die Andere transferieren
-      this.postingsInCheck.Remove(postingToAccept.getPostID(), out postingToAccept);
-      this.postings.TryAdd(postingToAccept.getPostID(),postingToAccept);
-      if(publishType == PostingPublishManager.publishHourType.PREMIUM)
+      this.postingsInCheck.Remove(postingToAccept.getPostId(), out postingToAccept);
+      this.postings.TryAdd(postingToAccept.getPostId(),postingToAccept);
+      if(publishType == PostingPublishManager.PublishHourType.Premium)
       {
-        DateTime nextFreeSlotPremium = this.publishManager.getTimestampOfNextSlot(this.postingsToPublishPremiumHour.Count, PostingPublishManager.publishHourType.PREMIUM);
-        DateTime nextFreeSlotNormal = this.publishManager.getTimestampOfNextSlot(this.postingsToPublish.Count, PostingPublishManager.publishHourType.NORMAL);
+        DateTime nextFreeSlotPremium = this.publishManager.getTimestampOfNextSlot(this.postingsToPublishPremiumHour.Count, PostingPublishManager.PublishHourType.Premium);
+        DateTime nextFreeSlotNormal = this.publishManager.getTimestampOfNextSlot(this.postingsToPublish.Count, PostingPublishManager.PublishHourType.Normal);
         if(nextFreeSlotPremium < nextFreeSlotNormal)
         {
-          this.postingsToPublishPremiumHour.Enqueue(postingToAccept.getPostID());
-          return "Veröffentlichung voraussichtlich: " + nextFreeSlotPremium.ToString(Utilities.usedCultureInfo);
+          this.postingsToPublishPremiumHour.Enqueue(postingToAccept.getPostId());
+          return "Veröffentlichung voraussichtlich: " + nextFreeSlotPremium.ToString(Utilities.UsedCultureInfo);
         }
         else
         {
-          this.postingsToPublish.Enqueue(postingToAccept.getPostID());
-          return "Veröffentlichung voraussichtlich: " + nextFreeSlotNormal.ToString(Utilities.usedCultureInfo);
+          this.postingsToPublish.Enqueue(postingToAccept.getPostId());
+          return "Veröffentlichung voraussichtlich: " + nextFreeSlotNormal.ToString(Utilities.UsedCultureInfo);
         }          
       }
       else
       {
-        if(publishType == PostingPublishManager.publishHourType.HAPPY)
+        if(publishType == PostingPublishManager.PublishHourType.Happy)
         {
-          DateTime nextFreeSlotHappy = this.publishManager.getTimestampOfNextSlot(this.postingsToPublishHappyHour.Count, PostingPublishManager.publishHourType.HAPPY);
-          DateTime nextFreeSlotNormal = this.publishManager.getTimestampOfNextSlot(this.postingsToPublish.Count, PostingPublishManager.publishHourType.NORMAL);
+          DateTime nextFreeSlotHappy = this.publishManager.getTimestampOfNextSlot(this.postingsToPublishHappyHour.Count, PostingPublishManager.PublishHourType.Happy);
+          DateTime nextFreeSlotNormal = this.publishManager.getTimestampOfNextSlot(this.postingsToPublish.Count, PostingPublishManager.PublishHourType.Normal);
           if (nextFreeSlotHappy < nextFreeSlotNormal)
           {
-            this.postingsToPublishHappyHour.Enqueue(postingToAccept.getPostID());
-            return "Veröffentlichung voraussichtlich: " + nextFreeSlotHappy.ToString(Utilities.usedCultureInfo);
+            this.postingsToPublishHappyHour.Enqueue(postingToAccept.getPostId());
+            return "Veröffentlichung voraussichtlich: " + nextFreeSlotHappy.ToString(Utilities.UsedCultureInfo);
           }
           else
           {
-            this.postingsToPublish.Enqueue(postingToAccept.getPostID());
-            return "Veröffentlichung voraussichtlich: " + nextFreeSlotNormal.ToString(Utilities.usedCultureInfo);
+            this.postingsToPublish.Enqueue(postingToAccept.getPostId());
+            return "Veröffentlichung voraussichtlich: " + nextFreeSlotNormal.ToString(Utilities.UsedCultureInfo);
           }
         }
         else
         {
-          DateTime nextFreeSlotNormal = this.publishManager.getTimestampOfNextSlot(this.postingsToPublish.Count, PostingPublishManager.publishHourType.NORMAL);
-          this.postingsToPublish.Enqueue(postingToAccept.getPostID());
-          return "Veröffentlichung voraussichtlich: " + nextFreeSlotNormal.ToString(Utilities.usedCultureInfo);
+          DateTime nextFreeSlotNormal = this.publishManager.getTimestampOfNextSlot(this.postingsToPublish.Count, PostingPublishManager.PublishHourType.Normal);
+          this.postingsToPublish.Enqueue(postingToAccept.getPostId());
+          return "Veröffentlichung voraussichtlich: " + nextFreeSlotNormal.ToString(Utilities.UsedCultureInfo);
         }
       }
     }
@@ -239,7 +222,7 @@ namespace DRaumServerApp
       {
         if (posting.isDirty())
         {
-          postlist.Add(posting.getPostID());
+          postlist.Add(posting.getPostId());
         }
       }
       return postlist;
@@ -254,7 +237,7 @@ namespace DRaumServerApp
         {
           if (posting.isTextDirty())
           {
-            postlist.Add(posting.getPostID());
+            postlist.Add(posting.getPostId());
           }
         }
       }
@@ -274,7 +257,7 @@ namespace DRaumServerApp
         {
           if (posting.isFlagged())
           {
-            postlist.Add(posting.getPostID());
+            postlist.Add(posting.getPostId());
           }
         }
       }
@@ -291,13 +274,13 @@ namespace DRaumServerApp
       if(this.postingsToCheck.TryDequeue(out post))
       {
         this.postsCheckChangeFlag = true;
-        if (this.postingsInCheck.TryAdd(post.getPostID(), post))
+        if (this.postingsInCheck.TryAdd(post.getPostId(), post))
         {
-          return new KeyValuePair<long, string>(post.getPostID(), post.getPostingText());
+          return new KeyValuePair<long, string>(post.getPostId(), post.getPostingText());
         }
         else
         {
-          logger.Error("Konnte den Post nicht zu den gerade geprüften hinzufügen, ID: " + post.getPostID());
+          logger.Error("Konnte den Post nicht zu den gerade geprüften hinzufügen, ID: " + post.getPostId());
         }
       }
       return new KeyValuePair<long, string>(-1, "");
@@ -309,6 +292,7 @@ namespace DRaumServerApp
       {
         // put back
         this.postingsToCheck.Enqueue(posting);
+        this.postsCheckChangeFlag = true;
         return true;
       }
       else
@@ -338,6 +322,7 @@ namespace DRaumServerApp
       {
         return this.postingsInCheck[postingId].getPostingText().Substring(0, Math.Min(60, this.postingsInCheck[postingId].getPostingText().Length)) + " [...]";
       }
+
       logger.Error("Konnte den Teaser nicht laden: " + postingId);
       return "... Post nicht gefunden ...";
     }
@@ -346,18 +331,18 @@ namespace DRaumServerApp
     {
       if(this.postings.ContainsKey(postingId))
       {
-        return this.postings[postingId].getAuthorID();
+        return this.postings[postingId].getAuthorId();
       }
       foreach (Posting p in this.postingsToCheck)
       {
-        if (p.getPostID() == postingId)
+        if (p.getPostId() == postingId)
         {
-          return p.getAuthorID();
+          return p.getAuthorId();
         }
       }
       if(this.postingsInCheck.ContainsKey(postingId))
       {
-        return this.postingsInCheck[postingId].getAuthorID();
+        return this.postingsInCheck[postingId].getAuthorId();
       }
       return -1;
     }
@@ -370,6 +355,7 @@ namespace DRaumServerApp
         this.postingsInCheck.TryRemove(postingId, out posting);
         return;
       }
+
       logger.Error("Konnte den Post mit der ID " + postingId + " nicht löschen.");
     }
 
@@ -377,7 +363,7 @@ namespace DRaumServerApp
     {
       if (this.postings.ContainsKey(postingId))
       {
-        return this.postings[postingId].getAuthorID() == authorId;
+        return this.postings[postingId].getAuthorId() == authorId;
       }
       return false;
     }
@@ -410,7 +396,7 @@ namespace DRaumServerApp
     {
       if (this.postings.ContainsKey(postId))
       {
-        return this.postings[postId].getChatMessageID();
+        return this.postings[postId].getChatMessageId();
       }
       return -1;
     }
@@ -419,7 +405,7 @@ namespace DRaumServerApp
     {
       if (this.postings.ContainsKey(postId))
       {
-        return this.postings[postId].getChatMessageDailyID();
+        return this.postings[postId].getChatMessageDailyId();
       }
       return -1;
     }
@@ -428,7 +414,7 @@ namespace DRaumServerApp
     {
       if (this.postings.ContainsKey(postId))
       {
-        return this.postings[postId].getChatMessageWeeklyID();
+        return this.postings[postId].getChatMessageWeeklyId();
       }
       return -1;
     }
@@ -482,7 +468,7 @@ namespace DRaumServerApp
     {
       if (this.postings.ContainsKey(postid))
       {
-        this.postings[postid].setChatMessageDailyID(messageId);
+        this.postings[postid].setChatMessageDailyId(messageId);
       }
     }
 
@@ -490,7 +476,7 @@ namespace DRaumServerApp
     {
       if (this.postings.ContainsKey(postid))
       {
-        this.postings[postid].setChatMessageWeeklyID(messageId);
+        this.postings[postid].setChatMessageWeeklyId(messageId);
       }
     }
 
@@ -549,7 +535,7 @@ namespace DRaumServerApp
       {
         if (posting.shouldBeDeleted())
         {
-          resultList.Add(posting.getPostID());
+          resultList.Add(posting.getPostId());
         }
       }
       return resultList;
@@ -558,83 +544,99 @@ namespace DRaumServerApp
     internal List<long> getDailyTopPostsFromYesterday()
     {
       // Iteriere über alle Posts, filtern nach Gestern, Sortieren nach Votes, Top 3 zurück
-      DateTime yesterday = new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day, 0, 0, 0);
-      yesterday = yesterday.AddDays(-1.0);
-      List<Posting> result = new List<Posting>();
-      foreach(Posting posting in this.postings.Values)
+      try
       {
-        TimeSpan diff = posting.getPublishTimestamp() - yesterday;
-        if (diff.TotalHours >= 0.0 && diff.TotalHours <= 24.0 )
+        DateTime yesterday = new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day, 0, 0, 0);
+        yesterday = yesterday.AddDays(-1.0);
+        List<Posting> result = new List<Posting>();
+        foreach (Posting posting in this.postings.Values)
         {
-          if (posting.getUpVotePercentage() > 50)
+          TimeSpan diff = posting.getPublishTimestamp() - yesterday;
+          if (diff.TotalHours >= 0.0 && diff.TotalHours <= 24.0)
           {
-            result.Add(posting);
+            if (posting.getUpVotePercentage() > 50)
+            {
+              result.Add(posting);
+            }
           }
         }
-      }
-      if (result.Count > 3)
-      {
-        Array targetlist = result.ToArray();
-        Array.Sort(targetlist, new PostingVoteComparer());
-        List<long> resultList = new List<long>
+        if (result.Count > 3)
         {
-          ((Posting)targetlist.GetValue(0)).getPostID(),
-          ((Posting)targetlist.GetValue(1)).getPostID(),
-          ((Posting)targetlist.GetValue(2)).getPostID()
-        };
-        return resultList;
-      }
-      else
-      {
-        List<long> resultList = new List<long>();
-        foreach (Posting posting in result)
-        {
-          resultList.Add(posting.getPostID());
+          Array targetlist = result.ToArray();
+          Array.Sort(targetlist, new PostingVoteComparer());
+          List<long> resultList = new List<long>
+          {
+            ((Posting) targetlist.GetValue(0)).getPostId(),
+            ((Posting) targetlist.GetValue(1)).getPostId(),
+            ((Posting) targetlist.GetValue(2)).getPostId()
+          };
+          return resultList;
         }
-        return resultList;
+        else
+        {
+          List<long> resultList = new List<long>();
+          foreach (Posting posting in result)
+          {
+            resultList.Add(posting.getPostId());
+          }
+          return resultList;
+        }
+      }
+      catch (Exception ex)
+      {
+        logger.Error(ex,"Fehler beim Filtern nach den Top-Posts von gestern");
+        return new List<long>();
       }
     }
 
 
     internal List<long> getWeeklyTopPostsFromLastWeek()
     {
-      // Iteriere über alle Posts, filtern nach Gestern, Sortieren nach Votes, Top 3 zurück
-      DateTime lastWeek = new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day, 0, 0, 0);
-      lastWeek = lastWeek.AddDays(-7.0);
-      List<Posting> result = new List<Posting>();
-      foreach (Posting posting in this.postings.Values)
+      // Iteriere über alle Posts, filtern nach letzte Woche, Sortieren nach Votes, Top 5 zurück
+      try
       {
-        TimeSpan diff = posting.getPublishTimestamp() - lastWeek;
-        if (diff.TotalDays >= 0.0 && diff.TotalDays <= 7.0)
+        DateTime lastWeek = new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day, 0, 0, 0);
+        lastWeek = lastWeek.AddDays(-7.0);
+        List<Posting> result = new List<Posting>();
+        foreach (Posting posting in this.postings.Values)
         {
-          if (posting.getUpVotePercentage() > 50)
+          TimeSpan diff = posting.getPublishTimestamp() - lastWeek;
+          if (diff.TotalDays >= 0.0 && diff.TotalDays <= 7.0)
           {
-            result.Add(posting);
+            if (posting.getUpVotePercentage() > 50)
+            {
+              result.Add(posting);
+            }
           }
         }
-      }
-      if (result.Count > 5)
-      {
-        Array targetlist = result.ToArray();
-        Array.Sort(targetlist, new PostingVoteComparer());
-        List<long> resultList = new List<long>
+        if (result.Count > 5)
         {
-          ((Posting)targetlist.GetValue(0)).getPostID(),
-          ((Posting)targetlist.GetValue(1)).getPostID(),
-          ((Posting)targetlist.GetValue(2)).getPostID(),
-          ((Posting)targetlist.GetValue(3)).getPostID(),
-          ((Posting)targetlist.GetValue(4)).getPostID()
-        };
-        return resultList;
-      }
-      else
-      {
-        List<long> resultList = new List<long>();
-        foreach (Posting posting in result)
-        {
-          resultList.Add(posting.getPostID());
+          Array targetlist = result.ToArray();
+          Array.Sort(targetlist, new PostingVoteComparer());
+          List<long> resultList = new List<long>
+          {
+            ((Posting) targetlist.GetValue(0)).getPostId(),
+            ((Posting) targetlist.GetValue(1)).getPostId(),
+            ((Posting) targetlist.GetValue(2)).getPostId(),
+            ((Posting) targetlist.GetValue(3)).getPostId(),
+            ((Posting) targetlist.GetValue(4)).getPostId()
+          };
+          return resultList;
         }
-        return resultList;
+        else
+        {
+          List<long> resultList = new List<long>();
+          foreach (Posting posting in result)
+          {
+            resultList.Add(posting.getPostId());
+          }
+          return resultList;
+        }
+      }
+      catch (Exception ex)
+      {
+        logger.Error(ex,"Fehler beim Filtern nach den Top-Posts der letzten Woche");
+        return new List<long>();
       }
     }
 

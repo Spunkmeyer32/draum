@@ -1,12 +1,13 @@
-﻿using Newtonsoft.Json;
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using Telegram.Bot.Types;
-using static DRaumServerApp.Author;
+using DRaumServerApp.Postings;
+using JetBrains.Annotations;
+using Newtonsoft.Json;
+using static DRaumServerApp.Authors.Author;
 
-namespace DRaumServerApp
+namespace DRaumServerApp.Authors
 {
   internal class AuthorManager
   {
@@ -18,29 +19,18 @@ namespace DRaumServerApp
 
     internal AuthorManager()
     {
-      if (Utilities.RUNNINGINTESTMODE)
+      if (Utilities.Runningintestmode)
       {
-        Author.COOLDOWNMINUTES = 1;
-        Author.COOLDOWNMINUTESFLAGGING = 1;
-        Author.COOLDOWNHOURSPOSTING = 0;
-        Author.COOLDOWNHOURSFEEDBACK = 0;
-        AuthorManager.Maxmanagedusers = int.MaxValue;
+        Cooldownminutes = 1;
+        Cooldownminutesflagging = 1;
+        Cooldownhoursposting = 0;
+        Cooldownhoursfeedback = 0;
+        Maxmanagedusers = int.MaxValue;
       }
       this.authors = new ConcurrentDictionary<long, Author>();
     }
 
-    internal AuthorManager(IDictionary<long,Author> authors)
-    {
-      this.authors = new ConcurrentDictionary<long, Author>();
-      foreach(KeyValuePair<long,Author> pair in authors)
-      {
-        if(!this.authors.TryAdd(pair.Key, pair.Value))
-        {
-          logger.Error("Konnte folgende Nutzerdaten nicht in die Liste einfügen: " + pair.Key + " , " + pair.Value);
-        }
-      }
-    }
-
+    [CanBeNull]
     private Author getAuthor(long authorId)
     {
       if (this.authors.ContainsKey(authorId))
@@ -50,20 +40,36 @@ namespace DRaumServerApp
       return null;
     }
 
-    internal bool canUserVote(long postingid, long authorId)
+    internal bool canUserVote(long postingid, long authorId, string authorName)
     {
-      if (this.authors.ContainsKey(authorId))
+      Author author = this.getAuthor(authorId, authorName);
+      if (author != null)
       {
-        return this.authors[authorId].canVote(postingid);
+        try
+        {
+          return author.canVote(postingid);
+        }
+        catch (Exception e)
+        {
+          logger.Error(e,"Konnte den Autor " + authorId + " nicht abfragen, ob er eine Stimme abgeben darf");
+        }
       }
       return false;
     }
 
-    internal bool canUserFlag(long postingid, long authorId)
+    internal bool canUserFlag(long postingid, long authorId, string authorName)
     {
-      if (this.authors.ContainsKey(authorId))
+      Author author = this.getAuthor(authorId, authorName);
+      if (author != null)
       {
-        return this.authors[authorId].canFlag(postingid);
+        try
+        {
+          return author.canFlag(postingid);
+        }
+        catch (Exception e)
+        {
+          logger.Error(e,"Konnte den Autor " + authorId + " nicht abfragen, ob er einen Beitrag markieren darf");
+        }
       }
       return false;
     }
@@ -78,10 +84,7 @@ namespace DRaumServerApp
       {
         if (this.authors.Count < Maxmanagedusers)
         {
-          if (externalName == null)
-          {
-            externalName = "";
-          }
+          externalName ??= "";
           Author newAuthor = new Author(authorId, externalName);
           if (this.authors.TryAdd(authorId, newAuthor))
           {
@@ -103,87 +106,97 @@ namespace DRaumServerApp
     internal void getMedianAndTopLevel(out int medianOut, out int topOut)
     {
       // alle Autoren Prüfen und Median und Top ermitteln
-      int toplevel = 0;
-      ArrayList levellist = new ArrayList();
-      int temp;
-      foreach(Author author in this.authors.Values)
+      try
       {
-        temp = author.getLevel();
-        levellist.Add(temp);
-        if(temp > toplevel)
+        int toplevel = 0;
+        ArrayList levellist = new ArrayList();
+        foreach (Author author in this.authors.Values)
         {
-          toplevel = temp;
+          int temp = author.getLevel();
+          levellist.Add(temp);
+          if (temp > toplevel)
+          {
+            toplevel = temp;
+          }
         }
+        Array target = levellist.ToArray();
+        Array.Sort(target);
+        if (target.Length == 0)
+        {
+          medianOut = 0;
+          topOut = 0;
+          return;
+        }
+        // ReSharper disable once PossibleNullReferenceException
+        int median = (int) target.GetValue(target.Length / 2);
+        medianOut = median;
+        topOut = toplevel;
       }
-      Array target = levellist.ToArray();
-      Array.Sort(target);
-      if(target.Length == 0)
+      catch (Exception e)
       {
+        logger.Error(e,"Konnte Median- und Top-Level nicht ermitteln");
         medianOut = 0;
         topOut = 0;
-        return;
       }
-      int median = (int)target.GetValue(target.Length / 2);
-      medianOut = median;
-      topOut = toplevel;      
+    }
+
+    internal int getAuthorCount()
+    {
+      return this.authors.Count;
     }
 
     internal void setPostMode(long id, string externalName)
     {
       Author author = this.getAuthor(id, externalName);
-      author.setPostMode();
+      author?.setPostMode();
     }
 
-    internal PostingPublishManager.publishHourType getPublishType(long authorId, int premiumLevelCap)
+    internal PostingPublishManager.PublishHourType getPublishType(long authorId, int premiumLevelCap)
     {
       Author author = this.getAuthor(authorId);
-      if(author != null)
-      {
-        return author.getPublishType(premiumLevelCap);
-      }
-      return PostingPublishManager.publishHourType.NONE;
+      return author?.getPublishType(premiumLevelCap) ?? PostingPublishManager.PublishHourType.None;
     }
 
     internal bool isPostMode(long id, string externalName)
     {
       Author author = this.getAuthor(id, externalName);
-      return author.isInPostMode();
+      return author?.isInPostMode() ?? false;
     }
 
     internal void unsetModes(long id, string externalName)
     {
       Author author = this.getAuthor(id, externalName);
-      author.unsetModes();
+      author?.unsetModes();
     }
 
     internal void setFeedbackMode(long id, string externalName)
     {
       Author author = this.getAuthor(id, externalName);
-      author.setFeedbackMode();
+      author?.setFeedbackMode();
     }
 
     internal bool isFeedbackMode(long id, string externalName)
     {
       Author author = this.getAuthor(id, externalName);
-      return author.isInFeedbackMode();
+      return author?.isInFeedbackMode() ?? false;
     }
 
     internal bool isCoolDownOver(long id, string externalName, InteractionCooldownTimer timerType)
     {
       Author author = this.getAuthor(id, externalName);
-      return author.coolDownOver(timerType);
+      return author?.coolDownOver(timerType) ?? false;
     }
 
     internal void resetCoolDown(long id, string externalName, InteractionCooldownTimer timerType)
     {
       Author author = this.getAuthor(id, externalName);
-      author.resetCoolDown(timerType);
+      author?.resetCoolDown(timerType);
     }
 
     internal TimeSpan getCoolDownTimer(long id, string externalName, InteractionCooldownTimer timerType)
     {
       Author author = this.getAuthor(id, externalName);
-      return author.getCoolDownTimer(timerType);
+      return author?.getCoolDownTimer(timerType) ?? TimeSpan.MaxValue;
     }
 
     internal string getAuthorPostText(long authorId)
@@ -200,7 +213,7 @@ namespace DRaumServerApp
     {
       if (this.authors.ContainsKey(authorId))
       {
-        this.authors[authorId].vote(postingId);
+        this.authors[authorId]?.vote(postingId);
       }
     }
 
@@ -208,7 +221,7 @@ namespace DRaumServerApp
     {
       if (this.authors.ContainsKey(authorId))
       {
-        this.authors[authorId].flag(postingId);
+        this.authors[authorId]?.flag(postingId);
       }
     }
 
@@ -222,7 +235,7 @@ namespace DRaumServerApp
       }
       else
       {
-        logger.Warn("Konnte votes dem Nutzer mit der ID " + authorId + " nicht zuordnen");
+        logger.Warn("Konnte votes dem Autor mit der ID " + authorId + " nicht zuordnen");
       }
     }
 
@@ -235,28 +248,20 @@ namespace DRaumServerApp
       }
       else
       {
-        logger.Warn("Konnte die Veröffentlichung dem Nutzer mit der ID " + authorId + " nicht gutschreiben");
+        logger.Warn("Konnte die Veröffentlichung dem Autor mit der ID " + authorId + " nicht gutschreiben");
       }
     }
 
     internal int voteUpAndGetCount(long authorId, string username)
     {
       Author author = this.getAuthor(authorId, username);
-      if (author != null)
-      {
-        return author.voteUpAndGetCount();
-      }
-      return 0;
+      return author?.voteUpAndGetCount() ?? 0;
     }
 
     internal int voteDownAndGetCount(long authorId, string username)
     {
       Author author = this.getAuthor(authorId,username);
-      if (author != null)
-      {
-        return author.voteDownAndGetCount();
-      }
-      return 0;
+      return author?.voteDownAndGetCount() ?? 0;
     }
 
    

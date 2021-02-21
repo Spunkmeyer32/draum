@@ -2,13 +2,14 @@
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using DRaumServerApp.TelegramUtilities;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.ReplyMarkups;
 
-namespace DRaumServerApp.telegram
+namespace DRaumServerApp.CyclicTasks
 {
-  internal class FeedbackBufferedSending
+  internal class FeedbackSendingTask
   {
     private static readonly NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
 
@@ -21,7 +22,7 @@ namespace DRaumServerApp.telegram
     private readonly long feedbackChatId;
 
 
-    internal FeedbackBufferedSending(FeedbackManager feedbackManager, TelegramBotClient telegramBot, long feedbackchat)
+    internal FeedbackSendingTask(FeedbackManager feedbackManager, TelegramBotClient telegramBot, long feedbackchat)
     {
       this.feedbackManager = feedbackManager;
       this.feedbackBot = telegramBot;
@@ -29,7 +30,7 @@ namespace DRaumServerApp.telegram
       this.feedbackSendingTask = this.periodicFeedbackSendingTask(new TimeSpan(0, 0, 0, IntervalSendFeedbackSeconds, 0), this.cancelTaskSource.Token);
     }
 
-    internal async void shutDownTask()
+    internal async Task shutDownTask()
     {
       this.cancelTaskSource.Cancel();
       try
@@ -46,7 +47,7 @@ namespace DRaumServerApp.telegram
       }
     }
 
-    internal async Task periodicFeedbackSendingTask(TimeSpan interval, CancellationToken cancellationToken)
+    private async Task periodicFeedbackSendingTask(TimeSpan interval, CancellationToken cancellationToken)
     {
       logger.Info("Feedback-Senden-Task ist gestartet");
       SyncManager.register();
@@ -71,7 +72,7 @@ namespace DRaumServerApp.telegram
       logger.Info("Feedback-Senden-Task ist beendet");
     }
 
-    private void processFeedback()
+    private async void processFeedback()
     {
       if (!this.feedbackManager.feedBackAvailable() || this.feedbackManager.isWaitingForFeedbackReply())
       {
@@ -80,21 +81,13 @@ namespace DRaumServerApp.telegram
       // erhaltene Feedbacks verarbeiten, wenn grad keine Antwort geschrieben wird
       FeedbackElement feedback = this.feedbackManager.dequeueFeedback();
       bool fail = false;
-      InlineKeyboardButton replyButton = InlineKeyboardButton.WithCallbackData("Antworten", DRaumManager.modAcceptPrefix + feedback.chatID);
-      InlineKeyboardButton dismissButton = InlineKeyboardButton.WithCallbackData("Verwerfen", DRaumManager.modBlockPrefix + feedback.chatID);
-      List<InlineKeyboardButton> buttonlist = new List<InlineKeyboardButton>
-      {
-        replyButton,
-        dismissButton
-      };
-      InlineKeyboardMarkup keyboard = new InlineKeyboardMarkup(buttonlist);
       try
       {
-        Message msg = this.feedbackBot.SendTextMessageAsync(
+        Message msg = await this.feedbackBot.SendTextMessageAsync(
           chatId: this.feedbackChatId,
-          text: feedback.text,
-          replyMarkup: keyboard
-        ).Result;
+          text: feedback.Text,
+          replyMarkup: Keyboards.getFeedbackReplyKeyboard(feedback.ChatId)
+        );
         if (msg == null || msg.MessageId == 0)
         {
           logger.Error("Es gab ein Problem beim senden der Feedback-Nachricht");

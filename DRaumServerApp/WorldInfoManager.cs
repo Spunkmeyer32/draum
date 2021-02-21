@@ -21,7 +21,7 @@ namespace DRaumServerApp
     private const string TrendDown = "↘️";
     private const string TrendEqual = "➡️";
 
-    private string goldPriceInEuroTrend =  TrendEqual;
+    private string goldPriceInEuroTrend = TrendEqual;
     private string silverPriceInEuroTrend = TrendEqual;
     private string unleadedFuelPriceInEuroTrend = TrendEqual;
     private string unleadedBioFuelPriceInEuroTrend = TrendEqual;
@@ -30,7 +30,7 @@ namespace DRaumServerApp
 
     private string infoString = "";
     private DateTime lastCheck = DateTime.Now;
-    private static readonly CultureInfo currencyCulture = Utilities.usedCultureInfo;
+    private static readonly CultureInfo currencyCulture = Utilities.UsedCultureInfo;
 
 
     public string getInfoStringForChat()
@@ -43,10 +43,14 @@ namespace DRaumServerApp
       // Daten einholen und in infoString speichern
       try
       {
-        this.getBitcoin();
-        this.getFuelprice();
-        this.getGold();
-        this.getSilver();
+        if (!Utilities.Runningintestmode)
+        {
+          this.getBitcoin();
+          this.getFuelprice();
+          this.getGold();
+          this.getSilver();
+        }
+
         if (this.infoString.Length < 10)
         {
           // Keine alten Daten, keine Trends anzeigen
@@ -147,9 +151,7 @@ namespace DRaumServerApp
 
     private void getFuelprice()
     {
-      string url = "https://creativecommons.tankerkoenig.de/json/prices.php?ids="+ 
-        ConfigurationManager.AppSettings["infoAPIIDFuel"] + "&apikey="+ 
-        ConfigurationManager.AppSettings["infoAPIKeyFuel"];
+      string url = "https://creativecommons.tankerkoenig.de/json/prices.php?ids="+ ConfigurationManager.AppSettings["infoAPIIDFuel"] + "&apikey="+ ConfigurationManager.AppSettings["infoAPIKeyFuel"];
       var client = new RestClient(url);
       var request = new RestRequest(Method.GET);
       request.AddHeader("Content-Type", "application/json");

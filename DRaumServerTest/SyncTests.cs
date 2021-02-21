@@ -33,6 +33,7 @@ namespace DRaumServerTest
           Console.WriteLine("Task 1");
           Console.Out.Flush();
         }
+
         SyncManager.unregister();
       });
 
@@ -48,6 +49,7 @@ namespace DRaumServerTest
           Console.WriteLine("Task  2");
           Console.Out.Flush();
         }
+
         SyncManager.unregister();
       });
 
@@ -63,6 +65,7 @@ namespace DRaumServerTest
           Console.WriteLine("Task   3");
           Console.Out.Flush();
         }
+
         SyncManager.unregister();
       });
 
@@ -76,6 +79,7 @@ namespace DRaumServerTest
         Assert.Fail("Needed to call cancel");
         cts.Cancel();
       }
+
       Assert.AreEqual(0, v1 + v2 + v3);
       Thread.Sleep(50);
       Assert.AreEqual(0, v1 + v2 + v3);
