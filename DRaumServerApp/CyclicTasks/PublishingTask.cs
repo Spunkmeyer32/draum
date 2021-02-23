@@ -107,6 +107,8 @@ namespace DRaumServerApp.CyclicTasks
           {
             await this.telegramPublishBot.SendTextMessageAsync(
               chatId: this.draumChatId,
+              disableNotification: true,
+              disableWebPagePreview: true,
               text: motd);
           }
           catch (Exception e)
@@ -136,6 +138,8 @@ namespace DRaumServerApp.CyclicTasks
           {
             await this.telegramPublishBot.SendTextMessageAsync(
               chatId: this.draumChatId,
+              disableNotification: true,
+              disableWebPagePreview: true,
               text: news);
           }
           catch (Exception e)
@@ -167,6 +171,7 @@ namespace DRaumServerApp.CyclicTasks
             Message result = await this.telegramPublishBot.SendTextMessageAsync(
               chatId: this.draumDailyChatId,
               parseMode: ParseMode.Html,
+              disableWebPagePreview: true,
               text: this.textBuilder.buildPostingTextForTopTeaser(postId),
               replyMarkup: Keyboards.getTopPostLinkKeyboard(this.posts.getMessageId(postId), DRaumManager.Roomname)
             );
@@ -263,6 +268,7 @@ namespace DRaumServerApp.CyclicTasks
             Message result = await this.telegramPublishBot.SendTextMessageAsync(
               chatId: this.draumWeeklyChatId,
               parseMode: ParseMode.Html,
+              disableWebPagePreview: true,
               text: this.textBuilder.buildPostingTextForTopTeaser(postId),
               replyMarkup: Keyboards.getTopPostLinkKeyboard(this.posts.getMessageId(postId), DRaumManager.Roomname)
             );
@@ -293,6 +299,7 @@ namespace DRaumServerApp.CyclicTasks
             chatId: this.draumChatId,
             parseMode: ParseMode.Html,
             text: this.textBuilder.buildPostingText(postingId),
+            disableWebPagePreview: true,
             replyMarkup: Keyboards.getPostKeyboard(this.posts.getUpVotes(postingId), this.posts.getDownVotes(postingId), postingId)
           );
           if (result == null || result.MessageId == 0)

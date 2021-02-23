@@ -18,14 +18,14 @@ namespace DRaumServerApp.CyclicTasks
     private readonly Task feedbackSendingTask;
 
     private readonly FeedbackManager feedbackManager;
-    private readonly TelegramBotClient feedbackBot;
+    private readonly Bots.FeedbackBot feedbackBot;
     private readonly long feedbackChatId;
 
 
-    internal FeedbackSendingTask(FeedbackManager feedbackManager, TelegramBotClient telegramBot, long feedbackchat)
+    internal FeedbackSendingTask(FeedbackManager feedbackManager, Bots.FeedbackBot feedbackBot, long feedbackchat)
     {
       this.feedbackManager = feedbackManager;
-      this.feedbackBot = telegramBot;
+      this.feedbackBot = feedbackBot;
       this.feedbackChatId = feedbackchat;
       this.feedbackSendingTask = this.periodicFeedbackSendingTask(new TimeSpan(0, 0, 0, IntervalSendFeedbackSeconds, 0), this.cancelTaskSource.Token);
     }
@@ -80,34 +80,14 @@ namespace DRaumServerApp.CyclicTasks
       }
       // erhaltene Feedbacks verarbeiten, wenn grad keine Antwort geschrieben wird
       FeedbackElement feedback = this.feedbackManager.dequeueFeedback();
-      bool fail = false;
-      try
+      Message msg = await this.feedbackBot.sendMessageWithKeyboard(this.feedbackChatId, feedback.Text,
+        Keyboards.getFeedbackReplyKeyboard(feedback.ChatId));
+      if (msg == null || msg.MessageId == 0)
       {
-        Message msg = await this.feedbackBot.SendTextMessageAsync(
-          chatId: this.feedbackChatId,
-          text: feedback.Text,
-          replyMarkup: Keyboards.getFeedbackReplyKeyboard(feedback.ChatId)
-        );
-        if (msg == null || msg.MessageId == 0)
-        {
-          logger.Error("Es gab ein Problem beim senden der Feedback-Nachricht");
-          fail = true;
-        }
+        logger.Error("Es gab ein Problem beim senden der Feedback-Nachricht. Feedback wird neu in die Liste einsortiert.");
+        this.feedbackManager.enqueueFeedback(feedback);
       }
-      catch (Exception ex)
-      {
-        logger.Error(ex, "(Exception)Fehler beim senden der Feedback-Nachricht");
-        fail = true;
-      }
-      if (!fail)
-      {
-        return;
-      }
-      logger.Info("Das Feedback-Element wird neu einsortiert");
-      this.feedbackManager.enqueueFeedback(feedback);
     }
 
   }
-
-
 }

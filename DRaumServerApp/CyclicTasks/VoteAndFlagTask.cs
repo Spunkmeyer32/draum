@@ -96,6 +96,7 @@ namespace DRaumServerApp.CyclicTasks
       {
         await this.telegramPublishBot.EditMessageTextAsync(
           chatId: this.draumChatId,
+          disableWebPagePreview: true,
           parseMode: ParseMode.Html,
           replyMarkup: Keyboards.getPostKeyboard(this.posts.getUpVotes(postId), this.posts.getDownVotes(postId), postId),
           messageId: this.posts.getMessageId(postId),

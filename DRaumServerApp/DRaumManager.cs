@@ -80,6 +80,8 @@ namespace DRaumServerApp
 
     private Bots.InputBot inputBot;
     private Bots.AdminBot adminBot;
+    private Bots.ModerateBot moderateBot;
+    private Bots.FeedbackBot feedbackBot;
 
     // Chats (mit dem Admin, Moderator, Feedback und zur Veröffentlichung in Kanälen)
     private readonly long feedbackChatId;
@@ -197,6 +199,8 @@ namespace DRaumServerApp
 
       this.inputBot = new Bots.InputBot(this.authors, this.statistics, this.telegramInputBot, this.posts, this.feedbackManager);
       this.adminBot = new Bots.AdminBot(this.telegramAdminBot);
+      this.moderateBot = new Bots.ModerateBot(this.telegramModerateBot);
+      this.feedbackBot = new Bots.FeedbackBot(this.telegramFeedbackBot);
 
       await this.adminBot.sendMessage(this.adminChatId,this.startupinfo +"\r\n" + this.statistics.getHardwareInfo());
 
@@ -252,7 +256,7 @@ namespace DRaumServerApp
       this.telegramAdminBot.StartReceiving(receivefilterCallbackOnly);
 
       logger.Info("Starte periodische Aufgaben");
-      this.feedbackSendingTask = new CyclicTasks.FeedbackSendingTask(this.feedbackManager, this.telegramFeedbackBot, this.feedbackChatId);
+      this.feedbackSendingTask = new CyclicTasks.FeedbackSendingTask(this.feedbackManager, this.feedbackBot, this.feedbackChatId);
       this.publishingTask = new CyclicTasks.PublishingTask(this.telegramPublishBot, this.draumChatId, this.posts,this.draumDailyChatId,this.draumWeeklyChatId, this.textBuilder);
       this.voteAndFlagTask = new CyclicTasks.VoteAndFlagTask(this.posts, this.draumChatId, this.textBuilder,this.telegramPublishBot,this.statistics, this.adminChatId, this.adminBot);
       this.statisticCollectionTask = new StatisticCollectionTask(this.authors,this.statistics,this.posts,this.adminBot,this.adminChatId);
@@ -284,7 +288,7 @@ namespace DRaumServerApp
         {
           break;
         }
-        this.inputCheckTask();
+        await this.inputCheckTask();
       }
 
       logger.Info("Input-Check-Task ist beendet");
@@ -317,7 +321,7 @@ namespace DRaumServerApp
     // ==  Task Methods
 
 
-    private void inputCheckTask()
+    private async Task inputCheckTask()
     {
       // Eingehende, zu moderierende Posts bearbeiten
       if (this.posts.getAndResetPostsCheckChangeFlag())
@@ -327,35 +331,22 @@ namespace DRaumServerApp
         string message = "Es gibt " + postsToCheck + " Posts zu moderieren.";
         if (messageId == -1)
         {
-          // Gibt noch keine Moderator-Message, neu Anlegen
-          try
+          Message msg = await this.moderateBot.sendMessageWithKeyboard(this.moderateChatId, message,
+            TelegramUtilities.Keyboards.getGetNextPostToModerateKeyboard(),false);
+          if (msg == null)
           {
-            Message msg = this.telegramModerateBot.SendTextMessageAsync(
-              chatId: this.moderateChatId,
-              text: message,
-              replyMarkup: TelegramUtilities.Keyboards.getGetNextPostToModerateKeyboard()).Result;
-            this.feedbackManager.setModerateMessageId(msg.MessageId);
+            logger.Error("Fehler beim Anlegen der Moderations-Nachricht");
           }
-          catch(Exception e)
+          else
           {
-            logger.Error(e, "Fehler beim Anlegen der Moderations-Nachricht");
+            this.feedbackManager.setModerateMessageId(msg.MessageId);
           }
         }
         else
         {
           // Update der Message
-          try
-          {
-             _ = this.telegramModerateBot.EditMessageTextAsync (
-              chatId: this.moderateChatId,
-              messageId: messageId,
-              text: message,
-              replyMarkup: TelegramUtilities.Keyboards.getGetNextPostToModerateKeyboard()).Result;
-          }
-          catch (Exception e)
-          {
-            logger.Error(e, "Fehler beim Aktualisieren der Moderations-Nachricht");
-          }
+          await this.moderateBot.editMessage(this.moderateChatId, messageId, message,
+              TelegramUtilities.Keyboards.getGetNextPostToModerateKeyboard());
         }
       }
     }
@@ -418,7 +409,7 @@ namespace DRaumServerApp
             logger.Info("Lade die Daten aus diesen Dateien: " + filelist[lastindex].Name);
             if(lastindex != filelist.Length-1)
             {
-              logger.Warn("Dies waren nicht die letzten Dateien im Verzeichnis!");
+              logger.Warn("Dies waren nicht die letzten Dateien im Verzeichnis: " + filelist[lastindex].Name);
             }
           }
           lastindex--;
@@ -516,10 +507,7 @@ namespace DRaumServerApp
       }
       finally
       {
-        if (backupfile != null)
-        {
-          backupfile.Close();
-        }
+        backupfile?.Close();
       }
     }
 
@@ -643,19 +631,10 @@ namespace DRaumServerApp
         }
         else
         {
-          try
-          {
-            await this.telegramModerateBot.SendTextMessageAsync(
-              chatId: this.moderateChatId,
-              text: "Konnte den Userchat zu folgender Posting-ID nicht erreichen (Posting wird aber veröffentlicht): " +
-                    postingId + " Textvorschau: " + this.posts.getPostingTeaser(postingId),
-              replyMarkup: TelegramUtilities.Keyboards.getGotItDeleteButtonKeyboard()
-            );
-          }
-          catch (Exception ex)
-          {
-            logger.Error(ex, "Fehler beim Benachrichtigen des Moderators über einen Fehler bei Post " + postingId);
-          }
+          await this.moderateBot.sendMessageWithKeyboard(this.moderateChatId,
+              "Konnte den Userchat zu folgender Posting-ID nicht erreichen (Posting wird aber veröffentlicht): " +
+              postingId + " Textvorschau: " + this.posts.getPostingTeaser(postingId),
+              TelegramUtilities.Keyboards.getGotItDeleteButtonKeyboard(),false);
           return false;
         }
       }
@@ -679,21 +658,15 @@ namespace DRaumServerApp
         if (callbackData.getPrefix().Equals(TelegramUtilities.Keyboards.ModBlockPrefix))
         {
           // verwerfen des feedbacks
-          await this.telegramFeedbackBot.EditMessageReplyMarkupAsync(
-           chatId: this.feedbackChatId,
-           messageId: e.CallbackQuery.Message.MessageId,
-           replyMarkup: null
-          );
+          await this.feedbackBot.removeInlineMarkup(this.feedbackChatId, e.CallbackQuery.Message.MessageId);
           return;
         }
         if(callbackData.getPrefix().Equals(TelegramUtilities.Keyboards.ModAcceptPrefix))
         {
           // Antworten auf das Feedback
           this.feedbackManager.enableWaitForFeedbackReply(callbackData.getId());
-          await this.telegramFeedbackBot.SendTextMessageAsync(
-            chatId: this.feedbackChatId,
-            text: "Der nächste eingegebene Text wird an den Autor gesendet"
-          );
+          await this.feedbackBot.sendMessage(this.feedbackChatId,
+            "Der nächste eingegebene Text wird an den Autor gesendet");
         }
       }
     }
@@ -790,61 +763,38 @@ namespace DRaumServerApp
           if(this.acceptPostForPublishing(callbackData.getId()).Result)
           {
             // Message not needed anymore, delete
-            await this.telegramModerateBot.DeleteMessageAsync(
-              chatId: this.moderateChatId,
-              messageId: e.CallbackQuery.Message.MessageId
-            );
-            await this.telegramModerateBot.AnswerCallbackQueryAsync(
-              callbackQueryId: e.CallbackQuery.Id,
-              text: "Beitrag wird freigegeben",
-              showAlert: true);
+            await this.moderateBot.removeMessage(this.moderateChatId, e.CallbackQuery.Message.MessageId);
+            await this.moderateBot.replyToCallback(e.CallbackQuery.Id, "Beitrag wird freigegeben");
           }
           else
           {
-            await this.telegramModerateBot.AnswerCallbackQueryAsync(
-              callbackQueryId: e.CallbackQuery.Id,
-              text: "Konnte den Post nicht freigeben...",
-              showAlert: true);
+            await this.moderateBot.replyToCallback(e.CallbackQuery.Id, "Konnte den Post nicht freigeben...");
           }
           return;
         }
         // ==  Der Moderator will den Beitrag bearbeiten und zurücksenden
         if (callbackData.getPrefix().Equals(TelegramUtilities.Keyboards.ModEditPrefix))
         {
-          await this.telegramModerateBot.EditMessageReplyMarkupAsync(
-            chatId: this.moderateChatId,
-            messageId: e.CallbackQuery.Message.MessageId,
-            replyMarkup: TelegramUtilities.Keyboards.getGotItDeleteButtonKeyboard()
-          );
+          await this.moderateBot.editMessageButtons(this.moderateChatId, e.CallbackQuery.Message.MessageId,
+            TelegramUtilities.Keyboards.getGotItDeleteButtonKeyboard());
           this.feedbackManager.waitForModerationText(callbackData.getId());
-          await this.telegramModerateBot.AnswerCallbackQueryAsync(
-            callbackQueryId: e.CallbackQuery.Id,
-            text: "Editierten Beitrag abschicken",
-            showAlert: true
-          );
+          await this.moderateBot.replyToCallback(e.CallbackQuery.Id, "Editierten Beitrag abschicken");
           return;
         }
         // ==  Der Moderator lehnt den Beitrag ab
         if (callbackData.getPrefix().Equals(TelegramUtilities.Keyboards.ModBlockPrefix))
         {
           // Nachricht entfernen
-          await this.telegramModerateBot.DeleteMessageAsync(
-            chatId: this.moderateChatId,
-            messageId: e.CallbackQuery.Message.MessageId
-          );
+          await this.moderateBot.removeMessage(this.moderateChatId, e.CallbackQuery.Message.MessageId);
           this.feedbackManager.waitForDenyingText(callbackData.getId());
-          await this.telegramModerateBot.SendTextMessageAsync(
-            chatId: this.moderateChatId,
-            text: "Begründung schreiben und abschicken"
-          );
+          await this.moderateBot.sendMessageWithKeyboard(this.moderateChatId, "Begründung schreiben und abschicken",
+            Keyboards.getGotItDeleteButtonKeyboard(),false);
           return;
         }
         // TODO Der Moderator blockt den Nutzer für einen Tag/ für eine Woche/ für einen Monat
         if(callbackData.getPrefix().Equals(TelegramUtilities.Keyboards.GenericMessageDeletePrefix))
         {
-          await this.telegramModerateBot.DeleteMessageAsync(
-            chatId: this.moderateChatId,
-            messageId: e.CallbackQuery.Message.MessageId);
+          await this.moderateBot.removeMessage(this.moderateChatId, e.CallbackQuery.Message.MessageId);
           return;
         }
         if(callbackData.getPrefix().Equals(TelegramUtilities.Keyboards.ModGetNextCheckPostPrefix))
@@ -852,21 +802,13 @@ namespace DRaumServerApp
           KeyValuePair<long, string> postingPair = this.posts.getNextPostToCheck();
           if (postingPair.Key != -1)
           {
-            try
+            Message msg = await this.moderateBot.sendMessageWithKeyboard(this.moderateChatId, postingPair.Value,
+              TelegramUtilities.Keyboards.getModeratePostKeyboard(postingPair.Key), true);
+            if (msg == null)
             {
-              await this.telegramModerateBot.SendTextMessageAsync(
-                chatId: this.moderateChatId,
-                text: postingPair.Value,
-                parseMode: ParseMode.Html,
-                replyMarkup: TelegramUtilities.Keyboards.getModeratePostKeyboard(postingPair.Key)
-              );
-            }
-            catch (Exception ex)
-            {
-              logger.Error(ex, "Fehler beim Versenden der Moderationsprüfung von Post " + postingPair.Key + " wird zurück in die Schlange gestellt.");
               if (!this.posts.putBackIntoQueue(postingPair.Key))
               {
-                logger.Error("Konnte den Post nicht wieder einfügen, wird gelöscht.");
+                logger.Error("Konnte den Post nicht wieder einfügen, wird gelöscht:" + postingPair.Key + " TEXT:" + postingPair.Value);
                 Postings.Posting posting = this.posts.removePostFromInCheck(postingPair.Key);
                 if(posting != null)
                 {
@@ -1093,10 +1035,7 @@ namespace DRaumServerApp
           long chatId = this.feedbackManager.processFeedbackReplyAndGetChatId();
           await this.inputBot.sendMessage(chatId,
             "Eine Antwort des Kanalbetreibers auf Ihr Feedback:\r\n\r\n" + e.Message.Text);
-          await this.telegramFeedbackBot.SendTextMessageAsync(
-            chatId: this.feedbackChatId,
-            text: "Feedback-Antwort ist verschickt"
-          );
+          await this.feedbackBot.sendMessage(this.feedbackChatId, "Feedback-Antwort ist verschickt");
         }
       }
     }
@@ -1114,23 +1053,18 @@ namespace DRaumServerApp
             posting.updateText(e.Message.Text, true);
             await this.inputBot.sendMessageWithKeyboard(posting.getAuthorId(), "MODERIERTER TEXT:\r\n\r\n"+posting.getPostingText(), TelegramUtilities.Keyboards.getAcceptDeclineModeratedPostKeyboard(posting.getPostId()));
             this.feedbackManager.resetProcessModerationText();
-            await this.telegramModerateBot.SendTextMessageAsync(
-              chatId: this.moderateChatId,
-              text: "Geänderter Text ist dem Autor zugestellt.",
-              replyMarkup: TelegramUtilities.Keyboards.getGotItDeleteButtonKeyboard()
-            );
-            await this.telegramModerateBot.DeleteMessageAsync(
-              chatId: this.moderateChatId,
-              messageId: e.Message.MessageId);
+            await this.moderateBot.sendMessageWithKeyboard(this.moderateChatId,
+              "Geänderter Text ist dem Autor zugestellt.", TelegramUtilities.Keyboards.getGotItDeleteButtonKeyboard(),
+              false);
+            await this.moderateBot.removeMessage(this.moderateChatId, e.Message.MessageId);
           }
           else
           {
             logger.Error("Konnte den zu editierenden Post nicht laden: " + this.feedbackManager.getNextModeratedPostId());
-            await this.telegramModerateBot.SendTextMessageAsync(
-              chatId: this.moderateChatId,
-              text: "Der zu editierende Post wurde nicht gefunden. Nochmal den Text abschicken. Wenn der Fehler bestehen bleibt, einen Administrator informieren",
-              replyMarkup: TelegramUtilities.Keyboards.getGotItDeleteButtonKeyboard()
-            );
+            await this.moderateBot.sendMessageWithKeyboard(this.moderateChatId,
+              "Der zu editierende Post wurde nicht gefunden. Nochmal den Text abschicken. Wenn der Fehler bestehen bleibt, einen Administrator informieren", 
+              TelegramUtilities.Keyboards.getGotItDeleteButtonKeyboard(),
+              false);
           }
           return;
         }
