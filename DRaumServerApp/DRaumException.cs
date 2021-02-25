@@ -3,7 +3,7 @@
 
 namespace DRaumServerApp
 {
-  internal class DRaumException : Exception
+  public class DRaumException : Exception
   {
     public DRaumException(string message)
         : base(message)

@@ -1,11 +1,10 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using DRaumServerApp.Postings;
 using JetBrains.Annotations;
 using Newtonsoft.Json;
-using static DRaumServerApp.Authors.Author;
+
 
 namespace DRaumServerApp.Authors
 {
@@ -15,16 +14,12 @@ namespace DRaumServerApp.Authors
     public static int Maxmanagedusers = 100; // int.max
 
     [JsonProperty]
-    private ConcurrentDictionary<long, Author> authors;    
+    private readonly ConcurrentDictionary<long, Author> authors;    
 
     internal AuthorManager()
     {
       if (Utilities.Runningintestmode)
       {
-        Cooldownminutes = 1;
-        Cooldownminutesflagging = 1;
-        Cooldownhoursposting = 0;
-        Cooldownhoursfeedback = 0;
         Maxmanagedusers = int.MaxValue;
       }
       this.authors = new ConcurrentDictionary<long, Author>();
@@ -181,19 +176,19 @@ namespace DRaumServerApp.Authors
       return author?.isInFeedbackMode() ?? false;
     }
 
-    internal bool isCoolDownOver(long id, string externalName, InteractionCooldownTimer timerType)
+    internal bool isCoolDownOver(long id, string externalName, Author.InteractionCooldownTimer timerType)
     {
       Author author = this.getAuthor(id, externalName);
       return author?.coolDownOver(timerType) ?? false;
     }
 
-    internal void resetCoolDown(long id, string externalName, InteractionCooldownTimer timerType)
+    internal void resetCoolDown(long id, string externalName, Author.InteractionCooldownTimer timerType)
     {
       Author author = this.getAuthor(id, externalName);
       author?.resetCoolDown(timerType);
     }
 
-    internal TimeSpan getCoolDownTimer(long id, string externalName, InteractionCooldownTimer timerType)
+    internal TimeSpan getCoolDownTimer(long id, string externalName, Author.InteractionCooldownTimer timerType)
     {
       Author author = this.getAuthor(id, externalName);
       return author?.getCoolDownTimer(timerType) ?? TimeSpan.MaxValue;

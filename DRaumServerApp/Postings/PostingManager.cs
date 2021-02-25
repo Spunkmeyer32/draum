@@ -110,11 +110,8 @@ namespace DRaumServerApp.Postings
     internal void testPublishing(long postingid, DateTime dateTime)
     {
       // Welche Stunde haben wir?
-      Posting postToPublish = this.postings[postingid];        
-      if (postToPublish != null)
-      {
-        postToPublish.setPublishTimestamp(dateTime);
-      }
+      Posting postToPublish = this.postings[postingid];
+      postToPublish?.setPublishTimestamp(dateTime);
     }
 
     internal void reAcceptFailedPost(long postingId)
@@ -238,13 +235,6 @@ namespace DRaumServerApp.Postings
       }
     }
 
-    internal void resetFlagged(long postingId)
-    {
-      if (this.postings.ContainsKey(postingId))
-      {
-        this.postings[postingId].resetFlagStatus();
-      }
-    }
 
     internal IEnumerable<long> getDirtyPosts()
     {
@@ -301,7 +291,7 @@ namespace DRaumServerApp.Postings
 
     internal KeyValuePair<long, string> getNextPostToCheck()
     {
-      Posting post = null;
+      Posting post;
       if(this.postingsToCheck.TryDequeue(out post))
       {
         this.postsCheckChangeFlag = true;
@@ -382,11 +372,11 @@ namespace DRaumServerApp.Postings
     {
       if (this.postingsInCheck.ContainsKey(postingId))
       {
-        Posting posting = null;
-        this.postingsInCheck.TryRemove(postingId, out posting);
-        return;
+        if (this.postingsInCheck.TryRemove(postingId, out _))
+        {
+          return;
+        }
       }
-
       logger.Error("Konnte den Post mit der ID " + postingId + " nicht löschen.");
     }
 
@@ -528,14 +518,7 @@ namespace DRaumServerApp.Postings
       return -1;
     }
 
-    internal bool removePost(long postingId)
-    {
-      if (this.postings.ContainsKey(postingId))
-      {
-        return this.postings.TryRemove(postingId, out var posting);
-      }
-      return false;
-    }
+    
 
     internal bool removeFlagFromPost(long postingId)
     {
@@ -696,14 +679,15 @@ namespace DRaumServerApp.Postings
     }
 
 
-    public bool deletePost(long postId)
+    internal bool removePost(long postingId)
     {
-      if (this.postings.ContainsKey(postId))
+      if (this.postings.ContainsKey(postingId))
       {
-        return this.postings.Remove(postId,out _);
+        return this.postings.TryRemove(postingId, out _);
       }
       return false;
     }
+
   }
 
 

@@ -21,7 +21,6 @@ namespace DRaumServerApp.CyclicTasks
 
     private readonly WorldInfoManager worldInfoManager = new WorldInfoManager();
     private readonly PostingManager posts;
-    private readonly PostingTextBuilder textBuilder;
 
     private const int IntervalCheckPublishSeconds = 60;
     private const string MessageOfTheDay = "== Service Post ==\r\n\r\n✍️ Möchten Sie selbst auch hier schreiben?\r\nDann verwenden Sie dazu den Eingabe-Bot:\r\n\r\n  🤖  @d_raum_input_bot  🤖";
@@ -29,9 +28,8 @@ namespace DRaumServerApp.CyclicTasks
     private readonly Task publishTask;
     private readonly PublishBot publishBot;
 
-    internal PublishingTask(PublishBot publishBot,PostingManager postingManager, PostingTextBuilder textBuilder)
+    internal PublishingTask(PublishBot publishBot,PostingManager postingManager)
     {
-      this.textBuilder = textBuilder;
       this.posts = postingManager;
       this.publishBot = publishBot;
       this.publishTask = this.periodicPublishingTask(new TimeSpan(0, 0, 0, IntervalCheckPublishSeconds, 0), this.cancelTaskSource.Token);

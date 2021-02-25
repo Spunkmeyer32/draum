@@ -1,11 +1,8 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using DRaumServerApp.TelegramUtilities;
-using Telegram.Bot;
 using Telegram.Bot.Types;
-using Telegram.Bot.Types.ReplyMarkups;
 
 namespace DRaumServerApp.CyclicTasks
 {
@@ -63,13 +60,13 @@ namespace DRaumServerApp.CyclicTasks
         {
           break;
         }
-        this.processFeedback();
+        await this.processFeedback();
       }
       SyncManager.unregister();
       logger.Info("Feedback-Senden-Task ist beendet");
     }
 
-    private async void processFeedback()
+    private async Task processFeedback()
     {
       if (!this.feedbackManager.feedBackAvailable() || this.feedbackManager.isWaitingForFeedbackReply())
       {
@@ -77,12 +74,16 @@ namespace DRaumServerApp.CyclicTasks
       }
       // erhaltene Feedbacks verarbeiten, wenn grad keine Antwort geschrieben wird
       FeedbackElement feedback = this.feedbackManager.dequeueFeedback();
-      Message msg = await this.feedbackBot.sendMessageWithKeyboard(feedback.Text,
-        Keyboards.getFeedbackReplyKeyboard(feedback.ChatId));
-      if (msg == null || msg.MessageId == 0)
+      if (feedback != null)
       {
-        logger.Error("Es gab ein Problem beim senden der Feedback-Nachricht. Feedback wird neu in die Liste einsortiert.");
-        this.feedbackManager.enqueueFeedback(feedback);
+        Message msg = await this.feedbackBot.sendMessageWithKeyboard(feedback.Text,
+          Keyboards.getFeedbackReplyKeyboard(feedback.ChatId));
+        if (msg == null || msg.MessageId == 0)
+        {
+          logger.Error(
+            "Es gab ein Problem beim senden der Feedback-Nachricht. Feedback wird neu in die Liste einsortiert.");
+          this.feedbackManager.enqueueFeedback(feedback);
+        }
       }
     }
 

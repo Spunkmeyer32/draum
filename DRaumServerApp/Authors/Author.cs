@@ -11,12 +11,12 @@ namespace DRaumServerApp.Authors
 
     public enum InteractionCooldownTimer {  Default, Posting, Flagging, Feedback };
 
-    internal static int Cooldownminutes = 2;
-    internal static int Cooldownminutesflagging = 30;
-    internal static int Cooldownhoursposting = 3;
-    internal static int Cooldownhoursfeedback = 1;
-    private static int _expForPosting = 16;
-    private static int _expForVote = 7;
+    private static int _cooldownminutes = 2;
+    private static int _cooldownminutesflagging = 30;
+    private static int _cooldownhoursposting = 3;
+    private static int _cooldownhoursfeedback = 1;
+    private const int ExpForPosting = 16;
+    private const int ExpForVote = 7;
 
     [JsonIgnore]
     private DateTime coolDownTimeStamp;
@@ -87,6 +87,13 @@ namespace DRaumServerApp.Authors
       this.postCount = 0;
       this.upvotesReceived = 0;
       this.downvotesReceived = 0;
+      if (Utilities.Runningintestmode)
+      {
+        _cooldownminutes = 1;
+        _cooldownminutesflagging = 1;
+        _cooldownhoursposting = 0;
+        _cooldownhoursfeedback = 0;
+      }
     }
 
     internal bool canVote(long postId)
@@ -165,7 +172,7 @@ namespace DRaumServerApp.Authors
 
     internal void publishedSuccessfully()
     {
-      this.exp += _expForPosting;
+      this.exp += ExpForPosting;
       this.postCount += 1;
       this.lastActivity = DateTime.Now;
     }
@@ -246,16 +253,16 @@ namespace DRaumServerApp.Authors
       switch (timerType)
       {
         case InteractionCooldownTimer.Feedback:
-          this.coolDownTimeStampFeedback = DateTime.Now.AddHours(Cooldownhoursfeedback);
+          this.coolDownTimeStampFeedback = DateTime.Now.AddHours(_cooldownhoursfeedback);
           break;
         case InteractionCooldownTimer.Flagging:
-          this.coolDownTimeStampFlagging = DateTime.Now.AddMinutes(Cooldownminutesflagging);
+          this.coolDownTimeStampFlagging = DateTime.Now.AddMinutes(_cooldownminutesflagging);
           break;
         case InteractionCooldownTimer.Posting:
-          this.coolDownTimeStampPosting = DateTime.Now.AddHours(Cooldownhoursposting);
+          this.coolDownTimeStampPosting = DateTime.Now.AddHours(_cooldownhoursposting);
           break;
         case InteractionCooldownTimer.Default:
-          this.coolDownTimeStamp = DateTime.Now.AddMinutes(Cooldownminutes);
+          this.coolDownTimeStamp = DateTime.Now.AddMinutes(_cooldownminutes);
           break;
       }
     }
@@ -274,7 +281,7 @@ namespace DRaumServerApp.Authors
     {
       lock (votingGaugeMutex)
       {
-        this.exp += _expForVote;
+        this.exp += ExpForVote;
         if (this.votingGauge <= 0)
         {
           this.votingGauge += 1;
@@ -297,7 +304,7 @@ namespace DRaumServerApp.Authors
     {
       lock (votingGaugeMutex)
       {
-        this.exp += _expForVote;
+        this.exp += ExpForVote;
         if (this.votingGauge >= 0)
         {
           this.votingGauge -= 1;

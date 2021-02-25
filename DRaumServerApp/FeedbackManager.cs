@@ -1,12 +1,16 @@
 ﻿using Newtonsoft.Json;
 using System;
 using System.Collections.Concurrent;
+using NLog;
 
 
 namespace DRaumServerApp
 {
   class FeedbackManager
   {
+    [JsonIgnore]
+    private static readonly NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
+
     [JsonIgnore]
     private readonly object dataMutex = new object();
     [JsonIgnore]
@@ -48,9 +52,12 @@ namespace DRaumServerApp
 
     internal FeedbackElement dequeueFeedback()
     {
-      FeedbackElement result = new FeedbackElement();
-      this.feedbacks.TryDequeue(out result);
-      return result;
+      if (this.feedbacks.TryDequeue(out FeedbackElement result))
+      {
+        return result;
+      }
+      logger.Warn("Konnte kein Feedback-Element laden");
+      return null;
     }
 
     internal bool feedBackAvailable()

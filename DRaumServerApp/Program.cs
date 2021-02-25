@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Timers;
 
 namespace DRaumServerApp
@@ -19,7 +20,7 @@ namespace DRaumServerApp
 
     // ReSharper disable once InconsistentNaming
     // ReSharper disable once UnusedParameter.Local
-    static void Main(string[] args)
+    static async Task Main(string[] args)
     {
       var logger = NLog.LogManager.GetCurrentClassLogger();
       logger.Info("D-Raum-Server startet");
@@ -27,7 +28,7 @@ namespace DRaumServerApp
       {
         DRaumManager dRaumManager = new DRaumManager();
         dRaumManager.initData();
-        dRaumManager.start();
+        await dRaumManager.start();
 
         logger.Info("D-Raum-Server läuft");
         timer.Elapsed += Timer_Elapsed;

@@ -130,7 +130,7 @@ namespace DRaumServerApp
       this.startupinfo += "\r\nMaximale Autorenzahl:" + AuthorManager.Maxmanagedusers;
     }
 
-    internal async void start()
+    internal async Task start()
     {
       this.telegramInputBot = new TelegramBotClient(ConfigurationManager.AppSettings["telegramInputToken"]);
       this.telegramPublishBot = new TelegramBotClient(ConfigurationManager.AppSettings["telegramPublishToken"]);
@@ -204,7 +204,7 @@ namespace DRaumServerApp
 
       logger.Info("Starte periodische Aufgaben");
       this.feedbackSendingTask = new FeedbackSendingTask(this.feedbackManager, this.feedbackBot);
-      this.publishingTask = new PublishingTask(this.publishBot, this.posts, this.textBuilder);
+      this.publishingTask = new PublishingTask(this.publishBot, this.posts);
       this.voteAndFlagTask = new VoteAndFlagTask(this.posts, this.publishBot, this.statistics, this.adminBot);
       this.statisticCollectionTask = new StatisticCollectionTask(this.authors, this.statistics, this.posts, this.adminBot);
       this.moderationCheckTask = new ModerationCheckTask(this.posts, this.feedbackManager, this.moderateBot);
@@ -360,7 +360,7 @@ namespace DRaumServerApp
         {
           di.Create();
         }
-        string datestring = this.getDateFileString();
+        string datestring = getDateFileString();
         logger.Info("Schreibe Post-Daten ins Dateisystem");
         backupfile = System.IO.File.Create(BackupFolder + Path.DirectorySeparatorChar + datestring + FilePrefix + "posts.json");
         StreamWriter sr = new StreamWriter(backupfile);
@@ -485,7 +485,7 @@ namespace DRaumServerApp
       this.posts.flag(postingId);
     }
 
-    private string getDateFileString()
+    private static string getDateFileString()
     {
       DateTime t = DateTime.Now;
       return t.Year+"_"+t.Month+"_"+t.Day+"_"+t.Hour + "_" + t.Minute;
@@ -781,7 +781,10 @@ namespace DRaumServerApp
         }
         if (callbackData.getPrefix().Equals(Keyboards.ModBlockPrefix))
         {
-          this.posts.deletePost(callbackData.getId());
+          if (!this.posts.removePost(callbackData.getId()))
+          {
+            logger.Error("Konnte den Post nicht aus dem Datensatz löschen: " + callbackData.getId());
+          }
           await this.inputBot.removeMessage(e.CallbackQuery.Message.MessageId, e.CallbackQuery.From.Id);
           await this.inputBot.sendMessage(e.CallbackQuery.From.Id, "Der Post wird nicht veröffentlicht und verworfen.");
           return;

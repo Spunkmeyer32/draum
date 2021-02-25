@@ -48,7 +48,7 @@ namespace DRaumServerApp.Bots
       }
       catch (OperationCanceledException)
       {
-        
+        // get out of loop
       }
       catch (Exception ex)
       {
@@ -175,7 +175,11 @@ namespace DRaumServerApp.Bots
           logger.Error(ex, "Fehler beim Löschen aus dem D-Raum-Wöchentlich");
         }
       }
-      this.posts.deletePost(postId);
+
+      if (!this.posts.removePost(postId))
+      {
+        logger.Error("Konnte den Post nicht aus dem Datensatz löschen : " + postId);
+      }
     }
 
     internal async Task publishInWeekly(long postId)
