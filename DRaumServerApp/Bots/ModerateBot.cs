@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Configuration;
 using System.Threading.Tasks;
 using NLog;
 using Telegram.Bot;
@@ -14,18 +15,21 @@ namespace DRaumServerApp.Bots
 
     private readonly TelegramBotClient telegramModerateBot;
 
+    private readonly long moderateChatId;
+
     internal ModerateBot(TelegramBotClient telegramModerateBot)
     {
+      this.moderateChatId = long.Parse(ConfigurationManager.AppSettings["moderateChatID"]);
       this.telegramModerateBot = telegramModerateBot;
     }
 
 
-    internal async Task removeMessage(long chatid, int messageId)
+    internal async Task removeMessage(int messageId)
     {
       try
       {
         await this.telegramModerateBot.DeleteMessageAsync(
-          chatId: chatid,
+          chatId: this.moderateChatId,
           messageId: messageId
         ).ConfigureAwait(false);
       }
@@ -35,30 +39,14 @@ namespace DRaumServerApp.Bots
       }
     }
 
-    internal async Task<Message> sendMessage(long chatId, string message)
-    {
-      try
-      {
-        return await this.telegramModerateBot.SendTextMessageAsync(
-          chatId: chatId,
-          text: message
-        ).ConfigureAwait(false);
-      }
-      catch (Exception ex)
-      {
-        logger.Error(ex, "Fehler beim Senden einer Nachricht an den Moderator, chatid: " + chatId);
-      }
-      return null;
-    }
-
-    internal async Task<Message> sendMessageWithKeyboard(long chatId, string message, InlineKeyboardMarkup keyboard, bool sendAsHtml)
+    internal async Task<Message> sendMessageWithKeyboard(string message, InlineKeyboardMarkup keyboard, bool sendAsHtml)
     {
       try
       {
         if (sendAsHtml)
         {
           return await this.telegramModerateBot.SendTextMessageAsync(
-            chatId: chatId,
+            chatId: this.moderateChatId,
             text: message,
             parseMode: ParseMode.Html,
             replyMarkup: keyboard
@@ -67,7 +55,7 @@ namespace DRaumServerApp.Bots
         else
         {
           return await this.telegramModerateBot.SendTextMessageAsync(
-            chatId: chatId,
+            chatId: this.moderateChatId,
             text: message,
             replyMarkup: keyboard
           ).ConfigureAwait(false);
@@ -75,33 +63,33 @@ namespace DRaumServerApp.Bots
       }
       catch (Exception ex)
       {
-        logger.Error(ex, "Fehler beim Senden einer Nachricht (Mit Inline-Keyboard) an den Moderator, chatid: " + chatId);
+        logger.Error(ex, "Fehler beim Senden einer Nachricht (Mit Inline-Keyboard) an den Moderator, chatid: " + this.moderateChatId);
       }
       return null;
     }
 
-    internal async Task editMessage(long chatId, int messageId, string message, InlineKeyboardMarkup inlineKeyboardMarkup)
+    internal async Task editMessage(int messageId, string message, InlineKeyboardMarkup inlineKeyboardMarkup)
     {
       try
       {
         await this.telegramModerateBot.EditMessageTextAsync(
-          chatId: chatId,
+          chatId: this.moderateChatId,
           messageId: messageId,
           replyMarkup: inlineKeyboardMarkup,
           text: message).ConfigureAwait(false);
       }
       catch (Exception ex)
       {
-        logger.Error(ex, "Fehler beim Aktualisieren einer Nachricht an den Admin, chatid: " + chatId);
+        logger.Error(ex, "Fehler beim Aktualisieren einer Nachricht an den Admin, chatid: " + this.moderateChatId);
       }
     }
 
-    internal async Task editMessageButtons(long chatId, int messageId, InlineKeyboardMarkup inlineKeyboardMarkup)
+    internal async Task editMessageButtons(int messageId, InlineKeyboardMarkup inlineKeyboardMarkup)
     {
       try
       {
         await this.telegramModerateBot.EditMessageReplyMarkupAsync(
-          chatId: chatId,
+          chatId: this.moderateChatId,
           messageId: messageId,
           replyMarkup: inlineKeyboardMarkup
         ).ConfigureAwait(false);

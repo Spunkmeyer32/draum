@@ -352,3 +352,5 @@ MigrationBackup/
 /DRaumServerApp/App.release.config
 /DRaumServerApp/App.testing.config
 /DRaumServerApp/.scannerwork
+/.sonarqube
+/sonar.bat

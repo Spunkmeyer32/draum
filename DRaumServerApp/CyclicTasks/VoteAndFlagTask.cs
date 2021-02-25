@@ -5,10 +5,7 @@ using System.Threading.Tasks;
 using DRaumServerApp.Bots;
 using DRaumServerApp.Postings;
 using DRaumServerApp.TelegramUtilities;
-using Telegram.Bot;
-using Telegram.Bot.Exceptions;
 using Telegram.Bot.Types;
-using Telegram.Bot.Types.Enums;
 
 
 namespace DRaumServerApp.CyclicTasks
@@ -22,24 +19,17 @@ namespace DRaumServerApp.CyclicTasks
     private readonly Task voteAndFlagTask;
 
     private readonly PostingManager posts;
-    private readonly long draumChatId;
-    private readonly PostingTextBuilder textBuilder;
-    private readonly TelegramBotClient telegramPublishBot;
+    private readonly PublishBot publishBot;
     private readonly DRaumStatistics statistics;
-    private readonly long adminChatId;
     private readonly AdminBot adminBot;
 
     private readonly HashSet<long> flaggedPostsSent = new HashSet<long>();
 
-    internal VoteAndFlagTask(PostingManager postingManager, long draumChatId, 
-      PostingTextBuilder textBuilder,TelegramBotClient telegramPublishBot, DRaumStatistics statistics, long adminChat, AdminBot adminBot)
+    internal VoteAndFlagTask(PostingManager postingManager,PublishBot publishBot, DRaumStatistics statistics, AdminBot adminBot)
     {
       this.statistics = statistics;
-      this.adminChatId = adminChat;
       this.adminBot = adminBot;
-      this.telegramPublishBot = telegramPublishBot;
-      this.textBuilder = textBuilder;
-      this.draumChatId = draumChatId;
+      this.publishBot = publishBot;
       this.posts = postingManager;
       this.voteAndFlagTask = this.periodicVoteAndFlagTask(new TimeSpan(0, 0, intervalVoteAndFlagCountMinutes, 0, 0), this.cancelTaskSource.Token);
     }
@@ -90,32 +80,7 @@ namespace DRaumServerApp.CyclicTasks
 
     }
 
-    private async Task updatePostText(long postId)
-    {
-      try
-      {
-        await this.telegramPublishBot.EditMessageTextAsync(
-          chatId: this.draumChatId,
-          disableWebPagePreview: true,
-          parseMode: ParseMode.Html,
-          replyMarkup: Keyboards.getPostKeyboard(this.posts.getUpVotes(postId), this.posts.getDownVotes(postId), postId),
-          messageId: this.posts.getMessageId(postId),
-          text: this.textBuilder.buildPostingText(postId));
-        this.posts.resetTextDirtyFlag(postId);
-      }
-      catch (Exception ex)
-      {
-        if (ex is MessageIsNotModifiedException)
-        {
-          this.posts.resetTextDirtyFlag(postId);
-          logger.Warn("Der Text des Posts " + postId + " ist nicht verändert");
-        }
-        else
-        {
-          logger.Error(ex, "Beim aktualisieren eines Textes eines Beitrags (" + postId + ") trat ein Fehler auf.");
-        }
-      }
-    }
+    
     
     private async Task processVoteAndFlag(CancellationToken cancellationToken)
     {
@@ -123,31 +88,14 @@ namespace DRaumServerApp.CyclicTasks
       IEnumerable<long> dirtyposts = this.posts.getDirtyPosts();
       foreach (long postId in dirtyposts)
       {
-        logger.Info("Buttons eines Posts (" + postId + ") werden aktualisiert");
         try
         {
-          await this.telegramPublishBot.EditMessageReplyMarkupAsync(
-            chatId: this.draumChatId,
-            messageId: this.posts.getMessageId(postId),
-            replyMarkup: TelegramUtilities.Keyboards.getPostKeyboard(this.posts.getUpVotes(postId), this.posts.getDownVotes(postId), postId), cancellationToken: cancellationToken);
-          this.posts.resetDirtyFlag(postId);
+          await this.publishBot.updatePostButtons(postId, cancellationToken);
           await Task.Delay(3000, cancellationToken);
         }
         catch (OperationCanceledException)
         {
           return;
-        }
-        catch (Exception ex)
-        {
-          if (ex is MessageIsNotModifiedException)
-          {
-            this.posts.resetDirtyFlag(postId);
-            logger.Warn("Die Buttons des Posts " + postId + " waren nicht verändert");
-          }
-          else
-          {
-            logger.Error(ex, "Beim aktualisieren eines Buttons eines Beitrags (" + postId + ") trat ein Fehler auf.");
-          }
         }
         if (cancellationToken.IsCancellationRequested)
         {
@@ -160,7 +108,7 @@ namespace DRaumServerApp.CyclicTasks
       foreach (long postId in dirtyposts)
       {
         logger.Info("Text eines Posts ("+postId+") wird aktualisiert");
-        await this.updatePostText(postId);
+        await this.publishBot.updatePostText(postId);
         try
         {
           await Task.Delay(3000, cancellationToken);
@@ -191,7 +139,7 @@ namespace DRaumServerApp.CyclicTasks
         {
           // getText and send to Admin
           string msgText = "Dieser Post wurde " + this.posts.getFlagCountOfPost(postId) + "-Mal geflaggt!!! \r\n" + this.posts.getPostingText(postId);
-          Message msg = await this.adminBot.sendMessageWithKeyboard(this.adminChatId, msgText, TelegramUtilities.Keyboards.getFlaggedPostModKeyboard(postId));
+          Message msg = await this.adminBot.sendMessageWithKeyboard(msgText, Keyboards.getFlaggedPostModKeyboard(postId));
           if (msg == null)
           {
             logger.Error("Beim senden eines geflaggten Beitrags trat ein Fehler auf.");
@@ -208,7 +156,7 @@ namespace DRaumServerApp.CyclicTasks
       }
 
       // Fehlermeldungen an den Admin
-      await this.adminBot.handleErrorMemory(this.adminChatId, cancellationToken);
+      await this.adminBot.handleErrorMemory(cancellationToken);
 
 
       // Update the Status of top-posts

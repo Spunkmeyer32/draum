@@ -19,14 +19,11 @@ namespace DRaumServerApp.CyclicTasks
 
     private readonly FeedbackManager feedbackManager;
     private readonly Bots.FeedbackBot feedbackBot;
-    private readonly long feedbackChatId;
 
-
-    internal FeedbackSendingTask(FeedbackManager feedbackManager, Bots.FeedbackBot feedbackBot, long feedbackchat)
+    internal FeedbackSendingTask(FeedbackManager feedbackManager, Bots.FeedbackBot feedbackBot)
     {
       this.feedbackManager = feedbackManager;
       this.feedbackBot = feedbackBot;
-      this.feedbackChatId = feedbackchat;
       this.feedbackSendingTask = this.periodicFeedbackSendingTask(new TimeSpan(0, 0, 0, IntervalSendFeedbackSeconds, 0), this.cancelTaskSource.Token);
     }
 
@@ -80,7 +77,7 @@ namespace DRaumServerApp.CyclicTasks
       }
       // erhaltene Feedbacks verarbeiten, wenn grad keine Antwort geschrieben wird
       FeedbackElement feedback = this.feedbackManager.dequeueFeedback();
-      Message msg = await this.feedbackBot.sendMessageWithKeyboard(this.feedbackChatId, feedback.Text,
+      Message msg = await this.feedbackBot.sendMessageWithKeyboard(feedback.Text,
         Keyboards.getFeedbackReplyKeyboard(feedback.ChatId));
       if (msg == null || msg.MessageId == 0)
       {

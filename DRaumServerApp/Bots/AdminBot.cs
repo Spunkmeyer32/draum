@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Configuration;
 using System.Threading;
 using System.Threading.Tasks;
 using DRaumServerApp.TelegramUtilities;
@@ -16,14 +17,16 @@ namespace DRaumServerApp.Bots
     private static readonly Logger logger = LogManager.GetCurrentClassLogger();
 
     private readonly TelegramBotClient telegramAdminBot;
+    private readonly long adminChatId;
 
     internal AdminBot(TelegramBotClient telegramAdminBot)
     {
+      this.adminChatId = long.Parse(ConfigurationManager.AppSettings["adminChatID"]);
       this.telegramAdminBot = telegramAdminBot;
     }
 
   
-    internal async Task removeMessage(int messageId, long adminChatId)
+    internal async Task removeMessage(int messageId)
     {
       try
       {
@@ -38,13 +41,13 @@ namespace DRaumServerApp.Bots
       }
     }
 
-    internal async Task handleErrorMemory(long chatId, CancellationToken cancelToken)
+    internal async Task handleErrorMemory(CancellationToken cancelToken)
     {
       MemoryTarget target = LogManager.Configuration.FindTargetByName<MemoryTarget>("errormemory");
       while (target.Logs.Count>0)
       {
         string s = target.Logs[0];
-        await this.sendMessageWithKeyboard(chatId, s, Keyboards.getGotItDeleteButtonKeyboard());
+        await this.sendMessageWithKeyboard(s, Keyboards.getGotItDeleteButtonKeyboard());
         try
         {
           await Task.Delay(3000, cancelToken);
@@ -63,34 +66,34 @@ namespace DRaumServerApp.Bots
 
 
     [ItemCanBeNull]
-    internal async Task<Message> sendMessage(long chatId, string message)
+    internal async Task<Message> sendMessage(string message)
     {
       try
       {
         return await this.telegramAdminBot.SendTextMessageAsync(
-          chatId: chatId,
+          chatId: adminChatId,
           text: message
         ).ConfigureAwait(false);
       }
       catch (Exception ex)
       {
-        logger.Error(ex, "Fehler beim Senden einer Nachricht an den Admin, chatid: " + chatId);
+        logger.Error(ex, "Fehler beim Senden einer Nachricht an den Admin, chatid: " + adminChatId);
       }
       return null;
     }
 
-    internal async Task editMessage(long chatId, int messageId, string message)
+    internal async Task editMessage(int messageId, string message)
     {
       try
       {
         await this.telegramAdminBot.EditMessageTextAsync(
-          chatId: chatId,
+          chatId: adminChatId,
           messageId: messageId,
           text: message).ConfigureAwait(false);
       }
       catch (Exception ex)
       {
-        logger.Error(ex, "Fehler beim Aktualisieren einer Nachricht an den Admin, chatid: " + chatId);
+        logger.Error(ex, "Fehler beim Aktualisieren einer Nachricht an den Admin, chatid: " + adminChatId);
       }
     }
 
@@ -110,24 +113,22 @@ namespace DRaumServerApp.Bots
     }
 
     [ItemCanBeNull]
-    internal async Task<Message> sendMessageWithKeyboard(long chatId, string message, InlineKeyboardMarkup keyboard)
+    internal async Task<Message> sendMessageWithKeyboard(string message, InlineKeyboardMarkup keyboard)
     {
       try
       {
         return await this.telegramAdminBot.SendTextMessageAsync(
-          chatId: chatId,
+          chatId: adminChatId,
           text: message,
           replyMarkup: keyboard
         ).ConfigureAwait(false);
       }
       catch (Exception ex)
       {
-        logger.Error(ex, "Fehler beim Senden einer Nachricht (Mit Inline-Keyboard) an den Admin, chatid: " + chatId);
+        logger.Error(ex, "Fehler beim Senden einer Nachricht (Mit Inline-Keyboard) an den Admin, chatid: " + adminChatId);
       }
       return null;
     }
-
-
 
 
   }

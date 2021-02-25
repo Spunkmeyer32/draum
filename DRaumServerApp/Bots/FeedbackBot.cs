@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Configuration;
 using System.Threading.Tasks;
 using JetBrains.Annotations;
 using NLog;
@@ -13,18 +14,20 @@ namespace DRaumServerApp.Bots
     private static readonly Logger logger = LogManager.GetCurrentClassLogger();
 
     private readonly TelegramBotClient telegramFeedbackBot;
+    private readonly long feedbackChatId;
 
     internal FeedbackBot(TelegramBotClient telegramFeedbackBot)
     {
+      this.feedbackChatId = long.Parse(ConfigurationManager.AppSettings["feedbackChatID"]);
       this.telegramFeedbackBot = telegramFeedbackBot;
     }
     
-    internal async Task removeInlineMarkup(long chatId, int messageId)
+    internal async Task removeInlineMarkup(int messageId)
     {
       try
       {
         await this.telegramFeedbackBot.EditMessageReplyMarkupAsync(
-          chatId: chatId,
+          chatId: this.feedbackChatId,
           messageId: messageId,
           replyMarkup: null
         ).ConfigureAwait(false);
@@ -35,36 +38,36 @@ namespace DRaumServerApp.Bots
       }
     }
 
-    internal async Task sendMessage(long chatId, string message)
+    internal async Task sendMessage(string message)
     {
       try
       {
         await this.telegramFeedbackBot.SendTextMessageAsync(
-          chatId: chatId,
+          chatId: this.feedbackChatId,
           text: message
         ).ConfigureAwait(false);
       }
       catch (Exception ex)
       {
-        logger.Error(ex, "Fehler beim senden einer Nachricht über den Feedback-Bot, chatid: " + chatId);
+        logger.Error(ex, "Fehler beim senden einer Nachricht über den Feedback-Bot, chatid: " + this.feedbackChatId);
       }
     }
 
 
     [ItemCanBeNull]
-    internal async Task<Message> sendMessageWithKeyboard(long chatId, string message, InlineKeyboardMarkup keyboard)
+    internal async Task<Message> sendMessageWithKeyboard(string message, InlineKeyboardMarkup keyboard)
     {
       try
       {
         return await this.telegramFeedbackBot.SendTextMessageAsync(
-          chatId: chatId,
+          chatId: this.feedbackChatId,
           text: message,
           replyMarkup: keyboard
         ).ConfigureAwait(false);
       }
       catch (Exception ex)
       {
-        logger.Error(ex, "Fehler beim Senden einer Nachricht (Mit Inline-Keyboard) durch den Feedback-Bot, chatid: " + chatId);
+        logger.Error(ex, "Fehler beim Senden einer Nachricht (Mit Inline-Keyboard) durch den Feedback-Bot, chatid: " + this.feedbackChatId);
       }
       return null;
     }

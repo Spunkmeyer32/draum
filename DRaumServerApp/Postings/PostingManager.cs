@@ -63,31 +63,30 @@ namespace DRaumServerApp.Postings
       this.postsCheckChangeFlag = true;
     }
 
-    internal Posting tryPublish()
+    internal long tryPublish()
     {
       // Welche Stunde haben wir?
-      Posting postToPublish = null;
       long postId = 0;
       try
       {
         switch (this.publishManager.getCurrentpublishType())
         {
           case PostingPublishManager.PublishHourType.Normal:
-            if (this.postingsToPublish.TryDequeue(out postId))
+            if (!this.postingsToPublish.TryDequeue(out postId))
             {
-              postToPublish = this.postings[postId];
+              postId = 0;
             }
             break;
           case PostingPublishManager.PublishHourType.Happy:
-            if (this.postingsToPublishHappyHour.TryDequeue(out postId))
+            if (!this.postingsToPublishHappyHour.TryDequeue(out postId))
             {
-              postToPublish = this.postings[postId];
+              postId = 0;
             }
             break;
           case PostingPublishManager.PublishHourType.Premium:
-            if (this.postingsToPublishPremiumHour.TryDequeue(out postId))
+            if (!this.postingsToPublishPremiumHour.TryDequeue(out postId))
             {
-              postToPublish = this.postings[postId];
+              postId = 0;
             }
             break;
         }
@@ -95,14 +94,17 @@ namespace DRaumServerApp.Postings
       catch (Exception ex)
       {
         logger.Error(ex,"Posting konnte nicht veröffentlicht werden, postId war: " + postId);
-        postToPublish = null;
+        postId = 0;
       }
+      return postId;
+    }
 
-      if(postToPublish != null)
+    internal void setPublishTimestamp(long postingId)
+    {
+      if (this.postings.ContainsKey(postingId))
       {
-        postToPublish.setPublishTimestamp(new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day, DateTime.Now.Hour, DateTime.Now.Minute, 0));
+        this.postings[postingId].setPublishTimestamp(new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day, DateTime.Now.Hour, DateTime.Now.Minute, 0));
       }
-      return postToPublish;
     }
 
     internal void testPublishing(long postingid, DateTime dateTime)
@@ -112,6 +114,35 @@ namespace DRaumServerApp.Postings
       if (postToPublish != null)
       {
         postToPublish.setPublishTimestamp(dateTime);
+      }
+    }
+
+    internal void reAcceptFailedPost(long postingId)
+    {
+      DateTime nextFreeSlotPremium = this.publishManager.getTimestampOfNextSlot(this.postingsToPublishPremiumHour.Count, PostingPublishManager.PublishHourType.Premium);
+      DateTime nextFreeSlotNormal = this.publishManager.getTimestampOfNextSlot(this.postingsToPublish.Count, PostingPublishManager.PublishHourType.Normal);
+      DateTime nextFreeSlotHappy = this.publishManager.getTimestampOfNextSlot(this.postingsToPublishHappyHour.Count, PostingPublishManager.PublishHourType.Happy);
+      if(nextFreeSlotPremium < nextFreeSlotNormal)
+      {
+        if (nextFreeSlotHappy < nextFreeSlotPremium)
+        {
+          this.postingsToPublishHappyHour.Enqueue(postingId);
+        }
+        else
+        {
+          this.postingsToPublishPremiumHour.Enqueue(postingId);
+        }
+      }
+      else
+      {
+        if (nextFreeSlotHappy < nextFreeSlotNormal)
+        {
+          this.postingsToPublishHappyHour.Enqueue(postingId);
+        }
+        else
+        {
+          this.postingsToPublish.Enqueue(postingId);
+        }
       }
     }
 
@@ -469,6 +500,14 @@ namespace DRaumServerApp.Postings
       if (this.postings.ContainsKey(postid))
       {
         this.postings[postid].setChatMessageDailyId(messageId);
+      }
+    }
+
+    internal void setChatMsgId(long postingId, int messageId)
+    {
+      if (this.postings.ContainsKey(postingId))
+      {
+        this.postings[postingId].setChatMessageId(messageId);
       }
     }
 

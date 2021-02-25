@@ -2,11 +2,11 @@
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using DRaumServerApp.Bots;
 using DRaumServerApp.Postings;
 using DRaumServerApp.TelegramUtilities;
-using Telegram.Bot;
-using Telegram.Bot.Types;
-using Telegram.Bot.Types.Enums;
+
+
 
 namespace DRaumServerApp.CyclicTasks
 {
@@ -24,22 +24,16 @@ namespace DRaumServerApp.CyclicTasks
     private readonly PostingTextBuilder textBuilder;
 
     private const int IntervalCheckPublishSeconds = 60;
+    private const string MessageOfTheDay = "== Service Post ==\r\n\r\n✍️ Möchten Sie selbst auch hier schreiben?\r\nDann verwenden Sie dazu den Eingabe-Bot:\r\n\r\n  🤖  @d_raum_input_bot  🤖";
     private readonly CancellationTokenSource cancelTaskSource = new CancellationTokenSource();
     private readonly Task publishTask;
+    private readonly PublishBot publishBot;
 
-    private readonly TelegramBotClient telegramPublishBot;
-    private readonly long draumChatId;
-    private readonly long draumDailyChatId;
-    private readonly long draumWeeklyChatId;
-
-    internal PublishingTask(TelegramBotClient publishBot, long chatId, PostingManager postingManager, long chatIdDaily, long chatIdWeekly, PostingTextBuilder textBuilder)
+    internal PublishingTask(PublishBot publishBot,PostingManager postingManager, PostingTextBuilder textBuilder)
     {
       this.textBuilder = textBuilder;
-      this.draumDailyChatId = chatIdDaily;
-      this.draumWeeklyChatId = chatIdWeekly;
       this.posts = postingManager;
-      this.draumChatId = chatId;
-      this.telegramPublishBot = publishBot;
+      this.publishBot = publishBot;
       this.publishTask = this.periodicPublishingTask(new TimeSpan(0, 0, 0, IntervalCheckPublishSeconds, 0), this.cancelTaskSource.Token);
     }
 
@@ -102,19 +96,7 @@ namespace DRaumServerApp.CyclicTasks
         logger.Info("Nächste MOTD am " + this.lastMessageOfTheDay.AddHours(24).ToString(Utilities.UsedCultureInfo));
         if (!skip)
         {
-          string motd = "== Service Post ==\r\n\r\n✍️ Möchten Sie selbst auch hier schreiben?\r\nDann verwenden Sie dazu den Eingabe-Bot:\r\n\r\n  🤖  @d_raum_input_bot  🤖";
-          try
-          {
-            await this.telegramPublishBot.SendTextMessageAsync(
-              chatId: this.draumChatId,
-              disableNotification: true,
-              disableWebPagePreview: true,
-              text: motd);
-          }
-          catch (Exception e)
-          {
-            logger.Error(e, "Fehler beim Posten der MOTD");
-          }
+          await this.publishBot.publishSilently(MessageOfTheDay);
         }
       }
 
@@ -133,19 +115,7 @@ namespace DRaumServerApp.CyclicTasks
         logger.Info("Nächste News am " + this.lastWorldNewsPost.AddHours(24).ToString(Utilities.UsedCultureInfo));
         if (!skip)
         {
-          string news = this.worldInfoManager.getInfoStringForChat();
-          try
-          {
-            await this.telegramPublishBot.SendTextMessageAsync(
-              chatId: this.draumChatId,
-              disableNotification: true,
-              disableWebPagePreview: true,
-              text: news);
-          }
-          catch (Exception e)
-          {
-            logger.Error(e, "Fehler beim Posten der News");
-          }
+          await this.publishBot.publishSilently(this.worldInfoManager.getInfoStringForChat());
         }
       }
 
@@ -167,72 +137,13 @@ namespace DRaumServerApp.CyclicTasks
           List<long> topPosts = this.posts.getDailyTopPostsFromYesterday();
           foreach (long postId in topPosts)
           {
-            logger.Info("Es soll folgender Post in Top-Daily veröffentlicht werden: " + postId);
-            Message result = await this.telegramPublishBot.SendTextMessageAsync(
-              chatId: this.draumDailyChatId,
-              parseMode: ParseMode.Html,
-              disableWebPagePreview: true,
-              text: this.textBuilder.buildPostingTextForTopTeaser(postId),
-              replyMarkup: Keyboards.getTopPostLinkKeyboard(this.posts.getMessageId(postId), DRaumManager.Roomname)
-            );
-            if (result == null || result.MessageId == 0)
-            {
-              logger.Error("Fehler beim Publizieren des Posts (daily,keine msg ID) bei Post " + postId);
-            }
-            else
-            {
-              this.posts.setDailyChatMsgId(postId, result.MessageId);
-            }
+            await this.publishBot.publishInDaily(postId);
             await Task.Delay(3000);
           }
-
           List<long> deleteablePosts = this.posts.getPostsToDelete();
           foreach (long postId in deleteablePosts)
           {
-            logger.Info("Es soll folgender Post gelöscht werden (abgelaufen): " + postId);
-            long messageId = this.posts.getMessageId(postId);
-            long messageDailyId = this.posts.getMessageIdDaily(postId);
-            long messageWeeklyId = this.posts.getMessageIdWeekly(postId);
-            if (messageId != -1)
-            {
-              try
-              {
-                await this.telegramPublishBot.DeleteMessageAsync(
-                  chatId: this.draumChatId,
-                  messageId: (int)messageId);
-              }
-              catch (Exception ex)
-              {
-                logger.Error(ex, "Fehler beim Löschen aus dem D-Raum");
-              }
-            }
-            if (messageDailyId != -1)
-            {
-              try
-              {
-                await this.telegramPublishBot.DeleteMessageAsync(
-                  chatId: this.draumDailyChatId,
-                  messageId: (int)messageDailyId);
-              }
-              catch (Exception ex)
-              {
-                logger.Error(ex, "Fehler beim Löschen aus dem D-Raum-Täglich");
-              }
-            }
-            if (messageWeeklyId != -1)
-            {
-              try
-              {
-                await this.telegramPublishBot.DeleteMessageAsync(
-                  chatId: this.draumWeeklyChatId,
-                  messageId: (int)messageWeeklyId);
-              }
-              catch (Exception ex)
-              {
-                logger.Error(ex, "Fehler beim Löschen aus dem D-Raum-Wöchentlich");
-              }
-            }
-            this.posts.deletePost(postId);
+            await this.publishBot.deletePostFromAllChannels(postId);
             await Task.Delay(3000);
           }
         }
@@ -264,65 +175,14 @@ namespace DRaumServerApp.CyclicTasks
           List<long> topPosts = this.posts.getWeeklyTopPostsFromLastWeek();
           foreach (long postId in topPosts)
           {
-            logger.Info("Es soll folgender Post in Top-Weekly veröffentlicht werden: " + postId);
-            Message result = await this.telegramPublishBot.SendTextMessageAsync(
-              chatId: this.draumWeeklyChatId,
-              parseMode: ParseMode.Html,
-              disableWebPagePreview: true,
-              text: this.textBuilder.buildPostingTextForTopTeaser(postId),
-              replyMarkup: Keyboards.getTopPostLinkKeyboard(this.posts.getMessageId(postId), DRaumManager.Roomname)
-            );
-            if (result == null || result.MessageId == 0)
-            {
-              logger.Error("Fehler beim Publizieren des Posts (weekly,keine msg ID) bei Post " + postId);
-            }
-            else
-            {
-              this.posts.setWeeklyChatMsgId(postId, result.MessageId);
-            }
+            await this.publishBot.publishInWeekly(postId);
             await Task.Delay(3000);
           }
         }
       }
 
-      long postingId = -1;
-      bool fail = false;
-      try
-      {
-        Posting toPublish = this.posts.tryPublish();
-        if (toPublish != null)
-        {
-          postingId = toPublish.getPostId();
-          // Ab in den D-Raum damit
-          logger.Info("Es soll folgender Post veröffentlicht werden: " + postingId);
-          Message result = await this.telegramPublishBot.SendTextMessageAsync(
-            chatId: this.draumChatId,
-            parseMode: ParseMode.Html,
-            text: this.textBuilder.buildPostingText(postingId),
-            disableWebPagePreview: true,
-            replyMarkup: Keyboards.getPostKeyboard(this.posts.getUpVotes(postingId), this.posts.getDownVotes(postingId), postingId)
-          );
-          if (result == null || result.MessageId == 0)
-          {
-            logger.Error("Fehler beim Publizieren des Posts (keine msg ID) bei Post " + postingId);
-          }
-          else
-          {
-            toPublish.resetTextDirtyFlag();
-            toPublish.resetDirtyFlag();
-            toPublish.setChatMessageId(result.MessageId);
-          }
-        }
-      }
-      catch (Exception e)
-      {
-        logger.Error(e, "(Exception)Fehler beim Publizieren des Posts: " + postingId);
-        fail = true;
-      }
-      if (fail)
-      {
-        // TODO den Post wieder einreihen
-      }
+      await this.publishBot.publishInMainChannel(this.posts.tryPublish());
+      
     }
 
   }

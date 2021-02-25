@@ -20,18 +20,16 @@ namespace DRaumServerApp.CyclicTasks
     private readonly DRaumStatistics statistics;
     private readonly PostingManager posts;
     private readonly AdminBot adminBot;
-    private readonly long adminChatId;
 
     private string adminStatisticText = "";
     private int adminStatisticMessageId = -1;
 
-    internal StatisticCollectionTask(AuthorManager authors,DRaumStatistics statistics,PostingManager posts,AdminBot adminBot,long adminChatId)
+    internal StatisticCollectionTask(AuthorManager authors,DRaumStatistics statistics,PostingManager posts,AdminBot adminBot)
     {
       this.authors = authors;
       this.posts = posts;
       this.statistics = statistics;
       this.adminBot = adminBot;
-      this.adminChatId = adminChatId;
       this.statisticCollectionTask = this.periodicStatisticCollectionTask(new TimeSpan(0, 0, intervalStatisticCollectionMinutes, 0, 0), this.cancelTaskSource.Token);
     }
 
@@ -62,7 +60,7 @@ namespace DRaumServerApp.CyclicTasks
         try
         {
           await Task.Delay(interval, cancellationToken);
-          await this.processStatisticCollection(cancellationToken);
+          await this.processStatisticCollection();
         }
         catch (OperationCanceledException)
         {
@@ -94,7 +92,7 @@ namespace DRaumServerApp.CyclicTasks
         this.adminStatisticText = newtext;
         if (adminStatisticMessageId == -1)
         {
-          Message msg = await this.adminBot.sendMessage(this.adminChatId, this.adminStatisticText);
+          Message msg = await this.adminBot.sendMessage(this.adminStatisticText);
           if (msg == null)
           {
             adminStatisticMessageId = -1;
@@ -107,12 +105,12 @@ namespace DRaumServerApp.CyclicTasks
         }
         else
         {
-          await this.adminBot.editMessage(this.adminChatId, adminStatisticMessageId, this.adminStatisticText);
+          await this.adminBot.editMessage(adminStatisticMessageId, this.adminStatisticText);
         }
       }
     }
 
-    private async Task processStatisticCollection(CancellationToken cancellationToken)
+    private async Task processStatisticCollection()
     {
       try
       {

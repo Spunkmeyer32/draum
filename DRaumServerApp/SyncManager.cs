@@ -8,11 +8,11 @@ namespace DRaumServerApp
   internal static class SyncManager
   {
     private static readonly NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
-    private static int _runningTasks = 0;
+    private static int _runningTasks;
     private static readonly object tasksmutex = new object();
-    private static volatile bool _shouldWait = false;
+    private static volatile bool _shouldWait;
     private static readonly ManualResetEvent resetEvent = new ManualResetEvent(false);
-    private static ManualResetEvent _externalEvent = null;
+    private static ManualResetEvent _externalEvent;
 
     /// <summary>
     /// Bevor der Task seine Arbeit verrichtet, sollte er diese Funktion aufrufen, welche eventuell zu synchronisationszwecken blockt
@@ -67,11 +67,6 @@ namespace DRaumServerApp
       _shouldWait = true;
     }
 
-    internal static bool isHaltingRequested()
-    {
-      return _shouldWait;
-    }
-
     /// <summary>
     /// Alle Tasks weiterführen
     /// </summary>
@@ -104,6 +99,14 @@ namespace DRaumServerApp
       {
         _runningTasks -= 1;
         logger.Info("Nun noch " + _runningTasks + " Tasks registriert");
+      }
+    }
+
+    internal static int getRunningTaskCount()
+    {
+      lock (tasksmutex)
+      {
+        return _runningTasks;
       }
     }
 
