@@ -2,6 +2,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 using System.Timers;
+using DRaumServerApp.Authors;
 
 namespace DRaumServerApp
 {
@@ -26,6 +27,8 @@ namespace DRaumServerApp
       logger.Info("D-Raum-Server startet");
       try
       {
+        Author.checkForTestingMode();
+        DRaumManager.checkForTestingMode();
         DRaumManager dRaumManager = new DRaumManager();
         dRaumManager.initData();
         await dRaumManager.start();

@@ -35,6 +35,40 @@ namespace DRaumServerApp.Authors
       return null;
     }
 
+    private Author getAuthor(long authorId, string externalName) 
+    {
+      if (this.authors.ContainsKey(authorId))
+      {
+        if (!this.authors[authorId].getAuthorName().Equals(externalName))
+        {
+          this.authors[authorId].setAuthorName(externalName);
+        }
+        return this.authors[authorId];
+      }
+      else
+      {
+        if (this.authors.Count < Maxmanagedusers)
+        {
+          externalName ??= "";
+          Author newAuthor = new Author(authorId, externalName);
+          if (this.authors.TryAdd(authorId, newAuthor))
+          {
+            logger.Info("Neuer Autor: " + externalName + " (" + authorId + ")");
+            return newAuthor;
+          }
+          else
+          {
+            throw new DRaumException("Aufgrund eines Fehlers konnte der Nutzer nicht hinzugefügt werden. Bitter später erneut probieren oder einen Administrator kontaktieren.");
+          }
+        }
+        else
+        {
+          logger.Warn("Ein Nutzer wurde abgewisen, da die Maximale Nutzerzahl erreicht ist");
+          throw new DRaumException("Maximale Nutzeranzahl erreicht");
+        }
+      }
+    }
+
     internal bool canUserVote(long postingid, long authorId, string authorName)
     {
       Author author = this.getAuthor(authorId, authorName);
@@ -69,35 +103,7 @@ namespace DRaumServerApp.Authors
       return false;
     }
 
-    private Author getAuthor(long authorId, string externalName) 
-    {
-      if (this.authors.ContainsKey(authorId))
-      {
-        return this.authors[authorId];
-      }
-      else
-      {
-        if (this.authors.Count < Maxmanagedusers)
-        {
-          externalName ??= "";
-          Author newAuthor = new Author(authorId, externalName);
-          if (this.authors.TryAdd(authorId, newAuthor))
-          {
-            logger.Info("Neuer Autor: " + externalName + " (" + authorId + ")");
-            return newAuthor;
-          }
-          else
-          {
-            throw new DRaumException("Aufgrund eines Fehlers konnte der Nutzer nicht hinzugefügt werden. Bitter später erneut probieren oder einen Administrator kontaktieren.");
-          }
-        }
-        else
-        {
-          logger.Warn("Ein Nutzer wurde abgewisen, da die Maximale Nutzerzahl erreicht ist");
-          throw new DRaumException("Maximale Nutzeranzahl erreicht");
-        }
-      }
-    }
+    
 
     internal void getMedianAndTopLevel(out int medianOut, out int topOut)
     {

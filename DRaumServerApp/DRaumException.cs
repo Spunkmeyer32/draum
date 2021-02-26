@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Runtime.Serialization;
+using JetBrains.Annotations;
 
 
 namespace DRaumServerApp
@@ -9,6 +11,7 @@ namespace DRaumServerApp
         : base(message)
     {
     }
+
 
   }
 }

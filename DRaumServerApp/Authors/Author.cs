@@ -87,6 +87,10 @@ namespace DRaumServerApp.Authors
       this.postCount = 0;
       this.upvotesReceived = 0;
       this.downvotesReceived = 0;
+    }
+
+    internal static void checkForTestingMode()
+    {
       if (Utilities.Runningintestmode)
       {
         _cooldownminutes = 1;
@@ -180,6 +184,11 @@ namespace DRaumServerApp.Authors
     internal string getAuthorName()
     {
       return this.authorName;
+    }
+
+    public void setAuthorName(string externalName)
+    {
+      this.authorName = externalName;
     }
 
     internal long getAuthorId()
@@ -323,6 +332,7 @@ namespace DRaumServerApp.Authors
       }
     }
 
+   
   }
     
 }

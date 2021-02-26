@@ -91,7 +91,9 @@ namespace DRaumServerApp
 
     internal static readonly string ReplyFeedback = "Danke für das Feedback 👍.\r\n\r\nEs wird nun von Moderatoren und Kanalbetreiber gelesen. Sie erhalten eventuell hier in diesem Chat eine Rückmeldung.";
     
-    internal DRaumManager()
+ 
+
+    internal static void checkForTestingMode()
     {
       string testmode = ConfigurationManager.AppSettings["runInTestMode"];
       if (testmode.Equals("true"))
