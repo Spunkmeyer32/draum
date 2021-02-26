@@ -384,6 +384,7 @@ namespace DRaumServerApp
         SyncManager.unhalt();
         logger.Info("Backup erledigt, weitermachen");
         this.statistics.setLastBackup(DateTime.Now);
+        /// TODO Alte Backups löschen
       }
       catch(Exception e)
       {
