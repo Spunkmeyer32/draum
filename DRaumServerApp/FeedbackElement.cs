@@ -1,13 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
+﻿
 
 namespace DRaumServerApp
 {
   class FeedbackElement
   {
-    public String Text { get; set; }
-    public long ChatId { get; set; }
+    public string Text { get; }
+    public long ChatId { get; }
 
     public FeedbackElement()
     {

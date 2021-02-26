@@ -1,11 +1,8 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using DRaumServerApp.TelegramUtilities;
-using Telegram.Bot;
 using Telegram.Bot.Types;
-using Telegram.Bot.Types.ReplyMarkups;
 
 namespace DRaumServerApp.CyclicTasks
 {
@@ -18,15 +15,12 @@ namespace DRaumServerApp.CyclicTasks
     private readonly Task feedbackSendingTask;
 
     private readonly FeedbackManager feedbackManager;
-    private readonly TelegramBotClient feedbackBot;
-    private readonly long feedbackChatId;
+    private readonly Bots.FeedbackBot feedbackBot;
 
-
-    internal FeedbackSendingTask(FeedbackManager feedbackManager, TelegramBotClient telegramBot, long feedbackchat)
+    internal FeedbackSendingTask(FeedbackManager feedbackManager, Bots.FeedbackBot feedbackBot)
     {
       this.feedbackManager = feedbackManager;
-      this.feedbackBot = telegramBot;
-      this.feedbackChatId = feedbackchat;
+      this.feedbackBot = feedbackBot;
       this.feedbackSendingTask = this.periodicFeedbackSendingTask(new TimeSpan(0, 0, 0, IntervalSendFeedbackSeconds, 0), this.cancelTaskSource.Token);
     }
 
@@ -53,10 +47,11 @@ namespace DRaumServerApp.CyclicTasks
       SyncManager.register();
       while (true)
       {
-        SyncManager.tryRun(cancellationToken);
         try
         {
           await Task.Delay(interval, cancellationToken);
+          SyncManager.tryRun(cancellationToken);
+          await this.processFeedback();
         }
         catch (OperationCanceledException)
         {
@@ -66,13 +61,12 @@ namespace DRaumServerApp.CyclicTasks
         {
           break;
         }
-        this.processFeedback();
       }
       SyncManager.unregister();
       logger.Info("Feedback-Senden-Task ist beendet");
     }
 
-    private async void processFeedback()
+    private async Task processFeedback()
     {
       if (!this.feedbackManager.feedBackAvailable() || this.feedbackManager.isWaitingForFeedbackReply())
       {
@@ -80,34 +74,18 @@ namespace DRaumServerApp.CyclicTasks
       }
       // erhaltene Feedbacks verarbeiten, wenn grad keine Antwort geschrieben wird
       FeedbackElement feedback = this.feedbackManager.dequeueFeedback();
-      bool fail = false;
-      try
+      if (feedback != null)
       {
-        Message msg = await this.feedbackBot.SendTextMessageAsync(
-          chatId: this.feedbackChatId,
-          text: feedback.Text,
-          replyMarkup: Keyboards.getFeedbackReplyKeyboard(feedback.ChatId)
-        );
+        Message msg = await this.feedbackBot.sendMessageWithKeyboard(feedback.Text,
+          Keyboards.getFeedbackReplyKeyboard(feedback.ChatId));
         if (msg == null || msg.MessageId == 0)
         {
-          logger.Error("Es gab ein Problem beim senden der Feedback-Nachricht");
-          fail = true;
+          logger.Error(
+            "Es gab ein Problem beim senden der Feedback-Nachricht. Feedback wird neu in die Liste einsortiert.");
+          this.feedbackManager.enqueueFeedback(feedback);
         }
       }
-      catch (Exception ex)
-      {
-        logger.Error(ex, "(Exception)Fehler beim senden der Feedback-Nachricht");
-        fail = true;
-      }
-      if (!fail)
-      {
-        return;
-      }
-      logger.Info("Das Feedback-Element wird neu einsortiert");
-      this.feedbackManager.enqueueFeedback(feedback);
     }
 
   }
-
-
 }

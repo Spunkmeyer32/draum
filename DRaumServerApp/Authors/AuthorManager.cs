@@ -1,11 +1,10 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using DRaumServerApp.Postings;
 using JetBrains.Annotations;
 using Newtonsoft.Json;
-using static DRaumServerApp.Authors.Author;
+
 
 namespace DRaumServerApp.Authors
 {
@@ -15,16 +14,12 @@ namespace DRaumServerApp.Authors
     public static int Maxmanagedusers = 100; // int.max
 
     [JsonProperty]
-    private ConcurrentDictionary<long, Author> authors;    
+    private readonly ConcurrentDictionary<long, Author> authors;    
 
     internal AuthorManager()
     {
       if (Utilities.Runningintestmode)
       {
-        Cooldownminutes = 1;
-        Cooldownminutesflagging = 1;
-        Cooldownhoursposting = 0;
-        Cooldownhoursfeedback = 0;
         Maxmanagedusers = int.MaxValue;
       }
       this.authors = new ConcurrentDictionary<long, Author>();
@@ -38,6 +33,40 @@ namespace DRaumServerApp.Authors
         return this.authors[authorId];
       }
       return null;
+    }
+
+    private Author getAuthor(long authorId, string externalName) 
+    {
+      if (this.authors.ContainsKey(authorId))
+      {
+        if (!this.authors[authorId].getAuthorName().Equals(externalName))
+        {
+          this.authors[authorId].setAuthorName(externalName);
+        }
+        return this.authors[authorId];
+      }
+      else
+      {
+        if (this.authors.Count < Maxmanagedusers)
+        {
+          externalName ??= "";
+          Author newAuthor = new Author(authorId, externalName);
+          if (this.authors.TryAdd(authorId, newAuthor))
+          {
+            logger.Info("Neuer Autor: " + externalName + " (" + authorId + ")");
+            return newAuthor;
+          }
+          else
+          {
+            throw new DRaumException("Aufgrund eines Fehlers konnte der Nutzer nicht hinzugefügt werden. Bitter später erneut probieren oder einen Administrator kontaktieren.");
+          }
+        }
+        else
+        {
+          logger.Warn("Ein Nutzer wurde abgewisen, da die Maximale Nutzerzahl erreicht ist");
+          throw new DRaumException("Maximale Nutzeranzahl erreicht");
+        }
+      }
     }
 
     internal bool canUserVote(long postingid, long authorId, string authorName)
@@ -74,34 +103,7 @@ namespace DRaumServerApp.Authors
       return false;
     }
 
-    private Author getAuthor(long authorId, string externalName) 
-    {
-      if (this.authors.ContainsKey(authorId))
-      {
-        return this.authors[authorId];
-      }
-      else
-      {
-        if (this.authors.Count < Maxmanagedusers)
-        {
-          externalName ??= "";
-          Author newAuthor = new Author(authorId, externalName);
-          if (this.authors.TryAdd(authorId, newAuthor))
-          {
-            logger.Info("Neuer Autor: " + externalName + " (" + authorId + ")");
-            return newAuthor;
-          }
-          else
-          {
-            throw new DRaumException("Aufgrund eines Fehlers konnte der Nutzer nicht hinzugefügt werden. Bitter später erneut probieren oder einen Administrator kontaktieren.");
-          }
-        }
-        else
-        {
-          throw new DRaumException("Maximale Nutzeranzahl erreicht");
-        }
-      }
-    }
+    
 
     internal void getMedianAndTopLevel(out int medianOut, out int topOut)
     {
@@ -181,19 +183,19 @@ namespace DRaumServerApp.Authors
       return author?.isInFeedbackMode() ?? false;
     }
 
-    internal bool isCoolDownOver(long id, string externalName, InteractionCooldownTimer timerType)
+    internal bool isCoolDownOver(long id, string externalName, Author.InteractionCooldownTimer timerType)
     {
       Author author = this.getAuthor(id, externalName);
       return author?.coolDownOver(timerType) ?? false;
     }
 
-    internal void resetCoolDown(long id, string externalName, InteractionCooldownTimer timerType)
+    internal void resetCoolDown(long id, string externalName, Author.InteractionCooldownTimer timerType)
     {
       Author author = this.getAuthor(id, externalName);
       author?.resetCoolDown(timerType);
     }
 
-    internal TimeSpan getCoolDownTimer(long id, string externalName, InteractionCooldownTimer timerType)
+    internal TimeSpan getCoolDownTimer(long id, string externalName, Author.InteractionCooldownTimer timerType)
     {
       Author author = this.getAuthor(id, externalName);
       return author?.getCoolDownTimer(timerType) ?? TimeSpan.MaxValue;
