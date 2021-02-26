@@ -58,10 +58,11 @@ namespace DRaumServerApp.CyclicTasks
       SyncManager.register();
       while (true)
       {
-        SyncManager.tryRun(cancellationToken);
         try
         {
           await Task.Delay(interval, cancellationToken);
+          SyncManager.tryRun(cancellationToken);
+          await this.processPublishing();
         }
         catch (OperationCanceledException)
         {
@@ -71,7 +72,6 @@ namespace DRaumServerApp.CyclicTasks
         {
           break;
         }
-        await this.processPublishing();
       }
       SyncManager.unregister();
       logger.Info("Publishing-Task ist beendet");

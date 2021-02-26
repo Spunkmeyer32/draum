@@ -93,6 +93,7 @@ namespace DRaumServerApp.Authors
         }
         else
         {
+          logger.Warn("Ein Nutzer wurde abgewisen, da die Maximale Nutzerzahl erreicht ist");
           throw new DRaumException("Maximale Nutzeranzahl erreicht");
         }
       }

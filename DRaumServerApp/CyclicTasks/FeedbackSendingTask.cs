@@ -47,10 +47,11 @@ namespace DRaumServerApp.CyclicTasks
       SyncManager.register();
       while (true)
       {
-        SyncManager.tryRun(cancellationToken);
         try
         {
           await Task.Delay(interval, cancellationToken);
+          SyncManager.tryRun(cancellationToken);
+          await this.processFeedback();
         }
         catch (OperationCanceledException)
         {
@@ -60,7 +61,6 @@ namespace DRaumServerApp.CyclicTasks
         {
           break;
         }
-        await this.processFeedback();
       }
       SyncManager.unregister();
       logger.Info("Feedback-Senden-Task ist beendet");

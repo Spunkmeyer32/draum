@@ -100,6 +100,7 @@ namespace DRaumServerApp.Bots
         logger.Info("Es soll folgender Post veröffentlicht werden: " + postingId);
         try
         {
+          this.posts.setPublishTimestamp(postingId);
           Message result = await this.telegramPublishBot.SendTextMessageAsync(
             chatId: this.draumChatId,
             parseMode: ParseMode.Html,
@@ -112,13 +113,14 @@ namespace DRaumServerApp.Bots
           {
             logger.Error("Fehler beim Publizieren des Posts (keine msg ID) bei Post " + postingId + " wird neu eingereiht.");
             this.posts.reAcceptFailedPost(postingId);
+            this.posts.unsetPublishTimestamp(postingId);
           }
           else
           {
             this.posts.resetTextDirtyFlag(postingId);
             this.posts.resetDirtyFlag(postingId);
             this.posts.setChatMsgId(postingId, result.MessageId);
-            this.posts.setPublishTimestamp(postingId);
+            
           }
         }
         catch (Exception ex)

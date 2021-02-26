@@ -56,10 +56,10 @@ namespace DRaumServerApp.CyclicTasks
       SyncManager.register();
       while (true)
       {
-        SyncManager.tryRun(cancellationToken);
         try
         {
           await Task.Delay(interval, cancellationToken);
+          SyncManager.tryRun(cancellationToken);
           await this.processStatisticCollection();
         }
         catch (OperationCanceledException)

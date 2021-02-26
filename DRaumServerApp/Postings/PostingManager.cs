@@ -107,6 +107,14 @@ namespace DRaumServerApp.Postings
       }
     }
 
+    public void unsetPublishTimestamp(long postingId)
+    {
+      if (this.postings.ContainsKey(postingId))
+      {
+        this.postings[postingId].setPublishTimestamp(new DateTime(1999, 1, 1));
+      }
+    }
+
     internal void testPublishing(long postingid, DateTime dateTime)
     {
       // Welche Stunde haben wir?
@@ -518,8 +526,6 @@ namespace DRaumServerApp.Postings
       return -1;
     }
 
-    
-
     internal bool removeFlagFromPost(long postingId)
     {
       if (this.postings.ContainsKey(postingId))
@@ -688,6 +694,7 @@ namespace DRaumServerApp.Postings
       return false;
     }
 
+    
   }
 
 

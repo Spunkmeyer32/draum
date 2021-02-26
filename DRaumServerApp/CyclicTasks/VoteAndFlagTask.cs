@@ -59,10 +59,10 @@ namespace DRaumServerApp.CyclicTasks
       SyncManager.register();
       while (true)
       {
-        SyncManager.tryRun(cancellationToken);
         try
         {
           await Task.Delay(interval, cancellationToken);
+          SyncManager.tryRun(cancellationToken);
           await this.processVoteAndFlag(cancellationToken);
         }
         catch (OperationCanceledException)
@@ -73,17 +73,17 @@ namespace DRaumServerApp.CyclicTasks
         {
           break;
         }
-        
       }
       SyncManager.unregister();
       logger.Info("Vote-And-Flag-Task ist beendet");
-
     }
 
-    
-    
-    private async Task processVoteAndFlag(CancellationToken cancellationToken)
+    private async Task checkDirtyPosts(CancellationToken cancellationToken)
     {
+      if (cancellationToken.IsCancellationRequested)
+      {
+        return;
+      }
       // Posts prüfen, ob Buttons im Chat angepasst werden müssen
       IEnumerable<long> dirtyposts = this.posts.getDirtyPosts();
       foreach (long postId in dirtyposts)
@@ -102,9 +102,16 @@ namespace DRaumServerApp.CyclicTasks
           return;
         }
       }
+    }
 
+    private async Task checkDirtyTextPosts(CancellationToken cancellationToken)
+    {
+      if (cancellationToken.IsCancellationRequested)
+      {
+        return;
+      }
       // Posts prüfen, ob Texte im Chat angepasst werden müssen
-      dirtyposts = this.posts.getTextDirtyPosts();
+      IEnumerable<long> dirtyposts = this.posts.getTextDirtyPosts();
       foreach (long postId in dirtyposts)
       {
         logger.Info("Text eines Posts ("+postId+") wird aktualisiert");
@@ -122,9 +129,14 @@ namespace DRaumServerApp.CyclicTasks
           return;
         }
       }
+    }
 
-
-
+    private async Task checkAndSendFlaggedPosts(CancellationToken cancellationToken)
+    {
+      if (cancellationToken.IsCancellationRequested)
+      {
+        return;
+      }
       // Prüfen, ob ein Flag vorliegt und dem Admin melden
       IEnumerable<long> flaggedPosts = this.posts.getFlaggedPosts();
       HashSet<long> flaggedSentOld = new HashSet<long>();
@@ -148,18 +160,34 @@ namespace DRaumServerApp.CyclicTasks
           {
             this.flaggedPostsSent.Add(postId);
           }
+          try
+          {
+            await Task.Delay(3000, cancellationToken);
+          }
+          catch (OperationCanceledException)
+          {
+            return;
+          }
+          if (cancellationToken.IsCancellationRequested)
+          {
+            return;
+          }
         }
         else
         {
           this.flaggedPostsSent.Add(postId);
         }
       }
+    }
 
+
+    private async Task processVoteAndFlag(CancellationToken cancellationToken)
+    {
+      await checkDirtyPosts(cancellationToken);
+      await checkDirtyTextPosts(cancellationToken);
+      await checkAndSendFlaggedPosts(cancellationToken);
       // Fehlermeldungen an den Admin
       await this.adminBot.handleErrorMemory(cancellationToken);
-
-
-      // Update the Status of top-posts
       this.posts.updateTopPostStatus(this.statistics);
     }
 
