@@ -1,0 +1,33 @@
+﻿Willkommen in der Kommentarspalte des Internets auf Telegram ;-)
+
+Beta-Phase: Es kann noch zu Software-Fehlern kommen, bitte Feedback über den Bot @d_raum_input_bot !
+
+Meine Idee:
+Auf Twitter und anderen Plattformen kann man gut Stimmungen einzelner Echokammern/Filterblasen verfolgen.
+Das verzerrt aufgrund der eigenen Filterblase und durch Blockierungen jedoch das Gesamtbild.
+
+Hier in diesem D-Raum auf Telegram sollen Meinungen aus verschiedenen 
+Echokammern zusammentreffen und bewertet werden um ein übergreifendes Stimmungsbild zu zeigen. 
+(Das D steht für vieles, suchen Sie sich was aus)
+
+Damit dies gelingt, sind ein paar Regeln einzuhalten:
+
+Die Texte hier sollen Kommentare sein, keine Kopien von Nachrichten im Netz (Urheberrecht und Sinn eines Meinungsforums).
+Sie sollen nicht gegen Gesetze verstoßen, sonst wird der Kanal zu gemacht.
+Keine offene Hetze oder persönliche Beleidigungen. Damit das auch eingehalten wird,
+moderiere ich die Beiträge (nur freischalten oder mit Änderungen, die der Autor oder die Autorin bestätigen muss).
+
+Damit keine Fan-Basis und Echokammern entstehen werden die Beiträge und die 
+Bewertungen anonymisiert. Gegen Spam arbeitet im Hintergrund ein Bot-Programm, welches stetig 
+verbessert wird. Zur Zeit ist eine Beitragsrate von 20 Minuten eingestellt. Wer etwas schreibt, bekommt den 
+nächsten freien Veröffentlichungs-Slot zugeteilt und angezeigt.
+
+Im Hauptkanal https://t.me/d_raum werden tagsüber die Beiträge veröffentlicht.
+Jeden Tag werden die drei meistbewerteten Beiträge in dem Kanal https://t.me/d_raum_daily verlinkt. 
+Einmal pro Woche werden die Top-5 Beiträge in dem Kanal https://t.me/d_raum_weekly verlinkt. 
+
+Beiträge werden gelöscht, wenn sie entweder zu alt werden, viele negative Stimmen 
+erhalten oder gegen Gesetze verstoßen. Abstimmen kann jeder mit 
+einem Telegram-Account durch klick auf die Knöpfe unter den Beiträgen.
+
+Selbst veröffentlichen, Feedback geben und weiteres kann man mit dem Eingabe-Bot @d_raum_input_bot

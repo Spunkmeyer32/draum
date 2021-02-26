@@ -104,9 +104,7 @@ namespace DRaumServerTest
     public void authorStatisticTest()
     {
       AuthorManager atm = new AuthorManager();
-      int median;
-      int top;
-      atm.getMedianAndTopLevel(out median, out top);
+      atm.getMedianAndTopLevel(out var median, out var top);
       Assert.AreEqual(0, median);
       Assert.AreEqual(0, top);
 

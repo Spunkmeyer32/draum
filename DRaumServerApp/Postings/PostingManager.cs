@@ -63,31 +63,30 @@ namespace DRaumServerApp.Postings
       this.postsCheckChangeFlag = true;
     }
 
-    internal Posting tryPublish()
+    internal long tryPublish()
     {
       // Welche Stunde haben wir?
-      Posting postToPublish = null;
       long postId = 0;
       try
       {
         switch (this.publishManager.getCurrentpublishType())
         {
           case PostingPublishManager.PublishHourType.Normal:
-            if (this.postingsToPublish.TryDequeue(out postId))
+            if (!this.postingsToPublish.TryDequeue(out postId))
             {
-              postToPublish = this.postings[postId];
+              postId = 0;
             }
             break;
           case PostingPublishManager.PublishHourType.Happy:
-            if (this.postingsToPublishHappyHour.TryDequeue(out postId))
+            if (!this.postingsToPublishHappyHour.TryDequeue(out postId))
             {
-              postToPublish = this.postings[postId];
+              postId = 0;
             }
             break;
           case PostingPublishManager.PublishHourType.Premium:
-            if (this.postingsToPublishPremiumHour.TryDequeue(out postId))
+            if (!this.postingsToPublishPremiumHour.TryDequeue(out postId))
             {
-              postToPublish = this.postings[postId];
+              postId = 0;
             }
             break;
         }
@@ -95,23 +94,60 @@ namespace DRaumServerApp.Postings
       catch (Exception ex)
       {
         logger.Error(ex,"Posting konnte nicht veröffentlicht werden, postId war: " + postId);
-        postToPublish = null;
+        postId = 0;
       }
+      return postId;
+    }
 
-      if(postToPublish != null)
+    internal void setPublishTimestamp(long postingId)
+    {
+      if (this.postings.ContainsKey(postingId))
       {
-        postToPublish.setPublishTimestamp(new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day, DateTime.Now.Hour, DateTime.Now.Minute, 0));
+        this.postings[postingId].setPublishTimestamp(new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day, DateTime.Now.Hour, DateTime.Now.Minute, 0));
       }
-      return postToPublish;
+    }
+
+    public void unsetPublishTimestamp(long postingId)
+    {
+      if (this.postings.ContainsKey(postingId))
+      {
+        this.postings[postingId].setPublishTimestamp(new DateTime(1999, 1, 1));
+      }
     }
 
     internal void testPublishing(long postingid, DateTime dateTime)
     {
       // Welche Stunde haben wir?
-      Posting postToPublish = this.postings[postingid];        
-      if (postToPublish != null)
+      Posting postToPublish = this.postings[postingid];
+      postToPublish?.setPublishTimestamp(dateTime);
+    }
+
+    internal void reAcceptFailedPost(long postingId)
+    {
+      DateTime nextFreeSlotPremium = this.publishManager.getTimestampOfNextSlot(this.postingsToPublishPremiumHour.Count, PostingPublishManager.PublishHourType.Premium);
+      DateTime nextFreeSlotNormal = this.publishManager.getTimestampOfNextSlot(this.postingsToPublish.Count, PostingPublishManager.PublishHourType.Normal);
+      DateTime nextFreeSlotHappy = this.publishManager.getTimestampOfNextSlot(this.postingsToPublishHappyHour.Count, PostingPublishManager.PublishHourType.Happy);
+      if(nextFreeSlotPremium < nextFreeSlotNormal)
       {
-        postToPublish.setPublishTimestamp(dateTime);
+        if (nextFreeSlotHappy < nextFreeSlotPremium)
+        {
+          this.postingsToPublishHappyHour.Enqueue(postingId);
+        }
+        else
+        {
+          this.postingsToPublishPremiumHour.Enqueue(postingId);
+        }
+      }
+      else
+      {
+        if (nextFreeSlotHappy < nextFreeSlotNormal)
+        {
+          this.postingsToPublishHappyHour.Enqueue(postingId);
+        }
+        else
+        {
+          this.postingsToPublish.Enqueue(postingId);
+        }
       }
     }
 
@@ -207,13 +243,6 @@ namespace DRaumServerApp.Postings
       }
     }
 
-    internal void resetFlagged(long postingId)
-    {
-      if (this.postings.ContainsKey(postingId))
-      {
-        this.postings[postingId].resetFlagStatus();
-      }
-    }
 
     internal IEnumerable<long> getDirtyPosts()
     {
@@ -270,7 +299,7 @@ namespace DRaumServerApp.Postings
 
     internal KeyValuePair<long, string> getNextPostToCheck()
     {
-      Posting post = null;
+      Posting post;
       if(this.postingsToCheck.TryDequeue(out post))
       {
         this.postsCheckChangeFlag = true;
@@ -351,11 +380,11 @@ namespace DRaumServerApp.Postings
     {
       if (this.postingsInCheck.ContainsKey(postingId))
       {
-        Posting posting = null;
-        this.postingsInCheck.TryRemove(postingId, out posting);
-        return;
+        if (this.postingsInCheck.TryRemove(postingId, out _))
+        {
+          return;
+        }
       }
-
       logger.Error("Konnte den Post mit der ID " + postingId + " nicht löschen.");
     }
 
@@ -472,6 +501,14 @@ namespace DRaumServerApp.Postings
       }
     }
 
+    internal void setChatMsgId(long postingId, int messageId)
+    {
+      if (this.postings.ContainsKey(postingId))
+      {
+        this.postings[postingId].setChatMessageId(messageId);
+      }
+    }
+
     internal void setWeeklyChatMsgId(long postid, int messageId)
     {
       if (this.postings.ContainsKey(postid))
@@ -487,15 +524,6 @@ namespace DRaumServerApp.Postings
         return this.postings[postId].getFlagCount();
       }
       return -1;
-    }
-
-    internal bool removePost(long postingId)
-    {
-      if (this.postings.ContainsKey(postingId))
-      {
-        return this.postings.TryRemove(postingId, out var posting);
-      }
-      return false;
     }
 
     internal bool removeFlagFromPost(long postingId)
@@ -657,14 +685,16 @@ namespace DRaumServerApp.Postings
     }
 
 
-    public bool deletePost(long postId)
+    internal bool removePost(long postingId)
     {
-      if (this.postings.ContainsKey(postId))
+      if (this.postings.ContainsKey(postingId))
       {
-        return this.postings.Remove(postId,out _);
+        return this.postings.TryRemove(postingId, out _);
       }
       return false;
     }
+
+    
   }
 
 
