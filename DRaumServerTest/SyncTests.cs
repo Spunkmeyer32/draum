@@ -20,54 +20,54 @@ namespace DRaumServerTest
       int v3 = 1;
 
       CancellationTokenSource cts = new CancellationTokenSource();
-
-      Task.Run(() =>
+      
+      Task.Run(async () => 
       {
         SyncManager.register();
         while (running)
         {
           v1 = 0;
-          SyncManager.tryRun(cts.Token);
+          await SyncManager.tryRunAfter(TimeSpan.FromMilliseconds(5), "test1", cts.Token);
           v1 = 1;
           Thread.Sleep(400);
           Console.WriteLine("Task 1");
-          Console.Out.Flush();
+          await Console.Out.FlushAsync();
         }
 
         SyncManager.unregister();
-      });
+      }, cts.Token);
 
-      Task.Run(() =>
+      Task.Run(async () =>
       {
         SyncManager.register();
         while (running)
         {
           v2 = 0;
-          SyncManager.tryRun(cts.Token);
+          await SyncManager.tryRunAfter(TimeSpan.FromMilliseconds(5), "test2", cts.Token);
           v2 = 1;
           Thread.Sleep(300);
           Console.WriteLine("Task  2");
-          Console.Out.Flush();
+          await Console.Out.FlushAsync();
         }
 
         SyncManager.unregister();
-      });
+      }, cts.Token);
 
-      Task.Run(() =>
+      Task.Run(async () =>
       {
         SyncManager.register();
         while (running)
         {
           v3 = 0;
-          SyncManager.tryRun(cts.Token);
+          await SyncManager.tryRunAfter(TimeSpan.FromMilliseconds(5), "test3", cts.Token);
           v3 = 1;
           Thread.Sleep(200);
           Console.WriteLine("Task   3");
-          Console.Out.Flush();
+          await Console.Out.FlushAsync();
         }
 
         SyncManager.unregister();
-      });
+      }, cts.Token);
 
       Thread.Sleep(1000);
       ManualResetEvent allHalted = new ManualResetEvent(false);

@@ -38,6 +38,11 @@ namespace DRaumServerApp
         timer.Start();
         Console.CancelKeyPress += async delegate (object sender, ConsoleCancelEventArgs e)
         {
+          if (_stopApp)
+          {
+            logger.Error("Beenden(sigint) schon angefordert, das geht nicht zweimal");
+            return;
+          }
           _sigintRec = true;
           e.Cancel = true;
           logger.Info("D-Raum-Server endet (SIGINT)");
@@ -49,6 +54,11 @@ namespace DRaumServerApp
         {
           if (!_sigintRec)
           {
+            if (_stopApp)
+            {
+              logger.Error("Beenden(sigterm) schon angefordert, das geht nicht zweimal");
+              return;
+            }
             logger.Info("D-Raum-Server endet (SIGTERM)");
             await dRaumManager.shutDown();
             _stopApp = true;

@@ -71,16 +71,16 @@ namespace DRaumServerApp
     private static readonly UpdateType[] receivefilterCallbackOnly = {UpdateType.CallbackQuery, UpdateType.Message };
     
     // Tasks und Intervalle für das regelmäßige Abarbeiten von Aufgaben
-    private static readonly int intervalBackUpDataMinutes = 60;
+    private static readonly int intervalBackUpDataMinutes = 1; // 60 TODO debug
     
     // Vorgefertigte Texte
-    internal static readonly string PostIntro = "Schreib-Modus!\r\n\r\nDie nächste Eingabe von Ihnen wird als Posting interpretiert. " +
+    internal static readonly string PostIntro = "Schreib-Modus! ✍️\r\n\r\nDie nächste Eingabe von Ihnen wird als Posting interpretiert. " +
                                                 "Folgende Anforderungen sind zu erfüllen: \r\n\r\n▫️Textlänge zwischen 100 und 1500\r\n▫️Keine URLs\r\n▫️Keine Schimpfworte und " +
                                                 "ähnliches\r\n▫️Der Text muss sich im Rahmen der Gesetze bewegen\r\n▫️Keine Urheberrechtsverletzungen\r\n\r\nDer Text wird dann maschinell und ggf. durch " +
                                                 "Menschen gegengelesen und wird bei eventuellen Anpassungen in diesem Chat zur Bestätigung durch Sie nochmal abgebildet. " +
                                                 "Das Posting wird anonym veröffentlicht. Ihre User-ID wird intern gespeichert.";
 
-    internal static readonly string FeedbackIntro = "Feedback-Modus!\r\n\r\nDie nächste Eingabe von Ihnen wird als Feedback für Moderatoren und Kanalbetreiber weitergeleitet. " +
+    internal static readonly string FeedbackIntro = "Feedback-Modus! 👍\r\n\r\nDie nächste Eingabe von Ihnen wird als Feedback für Moderatoren und Kanalbetreiber weitergeleitet. " +
                                                     "Folgende Anforderungen sind zu erfüllen: \r\n\r\n▫️Textlänge zwischen 100 und 1500\r\n▫️Keine URLs\r\n▫️Keine Schimpfworte und " +
                                                     "ähnliches.\r\n\r\nIhre User-ID wird für eine eventuelle Rückmeldung gespeichert.";
 
@@ -249,7 +249,7 @@ namespace DRaumServerApp
         this.telegramAdminBot.StopReceiving();
         ManualResetEvent mre = new ManualResetEvent(false);
         SyncManager.halt(mre);
-        if (!mre.WaitOne(TimeSpan.FromMinutes(3)))
+        if (!mre.WaitOne(TimeSpan.FromMinutes(1)))// 3 TODO debug
         {
           logger.Error("Die Tasks sind nicht alle angehalten! Tasks: " + SyncManager.getRunningTaskCount());
         }

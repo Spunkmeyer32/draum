@@ -1,9 +1,11 @@
-﻿using System.Threading;
+﻿using System;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace DRaumServerApp
 {
   /// <summary>
-  /// Um zyklische Tasks synchron anzuhalten ohne sie zu beenden kann diese Klasse verwendet werden.
+  /// Um zyklische Tasks synchron anzuhalten ohne sie zu beenden kann diese statische Klasse verwendet werden.
   /// </summary>
   internal static class SyncManager
   {
@@ -14,19 +16,42 @@ namespace DRaumServerApp
     private static readonly ManualResetEvent resetEvent = new ManualResetEvent(false);
     private static ManualResetEvent _externalEvent;
 
+
     /// <summary>
     /// Bevor der Task seine Arbeit verrichtet, sollte er diese Funktion aufrufen, welche eventuell zu synchronisationszwecken blockt
     /// </summary>
     /// <param name="cancelToken">Falls andere Tasks irgendwo hängen bleiben, kann der Aufruf abgebrochen werden</param>
-    internal static void tryRun(CancellationToken cancelToken)
+    internal static async Task tryRunAfter(TimeSpan delay, string taskName, CancellationToken cancelToken)
     {
+      bool throwCancel = false;
+      lock (tasksmutex)
+      {
+        _runningTasks -= 1;
+      }
+      try
+      {
+        await Task.Delay(delay, cancelToken);
+      }
+      catch (OperationCanceledException)
+      {
+        // continue
+        throwCancel = true;
+      }
       if (!_shouldWait)
       {
+        lock (tasksmutex)
+        {
+          _runningTasks += 1;
+        }
+
+        if (throwCancel)
+        {
+          throw new OperationCanceledException();
+        }
         return;
       }
       lock (tasksmutex)
       {
-        _runningTasks -= 1;
         if (_runningTasks == 0)
         {
           logger.Info("Alle Tasks haben gehalten");
@@ -38,6 +63,10 @@ namespace DRaumServerApp
           {
             unhalt();
           }
+        }
+        else
+        {
+          logger.Info("Jetzt sind noch " + _runningTasks + " Tasks aktiv");
         }
       }
       // Auf alle anderen Tasks warten
@@ -53,6 +82,10 @@ namespace DRaumServerApp
       {
         _runningTasks += 1;
       }
+      if (throwCancel)
+      {
+        throw new OperationCanceledException();
+      }
     }
 
     /// <summary>
@@ -61,8 +94,12 @@ namespace DRaumServerApp
     /// <param name="extEvnt"></param>
     internal static void halt(ManualResetEvent extEvnt)
     {
-      logger.Info(_runningTasks + " Tasks werden angehalten");
+      lock (tasksmutex)
+      {
+        logger.Info(_runningTasks + " Tasks werden angehalten");
+      }
       _externalEvent = extEvnt;
+      // signal deaktivieren, um tasks am weiterlaufen zu hindern
       resetEvent.Reset();
       _shouldWait = true;
     }
@@ -75,6 +112,7 @@ namespace DRaumServerApp
       logger.Info("Tasks werden fortgeführt");
       _shouldWait = false;
       _externalEvent = null;
+      // Dieses Signal wird alle weiterlaufen lassen:
       resetEvent.Set();
     }
 
@@ -98,7 +136,7 @@ namespace DRaumServerApp
       lock (tasksmutex)
       {
         _runningTasks -= 1;
-        logger.Info("Nun noch " + _runningTasks + " Tasks registriert");
+        logger.Info("Nun laufen noch " + _runningTasks + " Tasks (Andere sind beendet oder sind noch im Delay)");
       }
     }
 

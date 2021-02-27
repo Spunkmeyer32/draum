@@ -33,9 +33,9 @@ namespace DRaumServerApp
     private static readonly CultureInfo currencyCulture = Utilities.UsedCultureInfo;
 
 
-    public string getInfoStringForChat()
+    public string getInfoStringForChat(bool retrieveFromWeb)
     {
-      if (!((DateTime.Now - this.lastCheck).TotalHours >= 24.0) && this.infoString.Length >= 10)
+      if (!retrieveFromWeb && ((DateTime.Now - this.lastCheck).TotalHours < 24.0) && this.infoString.Length >= 10 )
       {
         return this.infoString;
       }

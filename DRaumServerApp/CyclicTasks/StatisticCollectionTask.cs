@@ -58,8 +58,7 @@ namespace DRaumServerApp.CyclicTasks
       {
         try
         {
-          await Task.Delay(interval, cancellationToken);
-          SyncManager.tryRun(cancellationToken);
+          await SyncManager.tryRunAfter(interval,"statisticcollection",cancellationToken);
           await this.processStatisticCollection();
         }
         catch (OperationCanceledException)

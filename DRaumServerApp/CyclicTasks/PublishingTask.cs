@@ -59,8 +59,7 @@ namespace DRaumServerApp.CyclicTasks
       {
         try
         {
-          await Task.Delay(interval, cancellationToken);
-          SyncManager.tryRun(cancellationToken);
+          await SyncManager.tryRunAfter(interval,"publishing",cancellationToken);
           await this.processPublishing();
         }
         catch (OperationCanceledException)
@@ -112,7 +111,7 @@ namespace DRaumServerApp.CyclicTasks
         logger.Info("Nächste News am " + this.lastWorldNewsPost.AddHours(24).ToString(Utilities.UsedCultureInfo));
         if (!skip)
         {
-          await this.publishBot.publishSilently(this.worldInfoManager.getInfoStringForChat());
+          await this.publishBot.publishSilently(this.worldInfoManager.getInfoStringForChat(true));
         }
       }
 
