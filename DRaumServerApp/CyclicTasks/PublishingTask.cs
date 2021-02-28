@@ -98,7 +98,7 @@ namespace DRaumServerApp.CyclicTasks
 
       skip = false;
       // News-Post
-      if (true)//(DateTime.Now - this.lastWorldNewsPost).TotalHours > 24.0)
+      if ((DateTime.Now - this.lastWorldNewsPost).TotalHours > 24.0)
       {
         if (this.lastWorldNewsPost.Year <= 2000)
         {
