@@ -242,12 +242,13 @@ namespace DRaumServerApp.Bots
       }
     }
 
-    internal async Task publishSilently(string message)
+    internal async Task publishSilentlyAsHtml(string message)
     {
       try
       {
         await this.telegramPublishBot.SendTextMessageAsync(
           chatId: this.draumChatId,
+          parseMode: ParseMode.Html,
           disableNotification: true,
           disableWebPagePreview: true,
           text: message).ConfigureAwait(false);

@@ -71,7 +71,7 @@ namespace DRaumServerApp
     private static readonly UpdateType[] receivefilterCallbackOnly = {UpdateType.CallbackQuery, UpdateType.Message };
     
     // Tasks und Intervalle für das regelmäßige Abarbeiten von Aufgaben
-    private static readonly int intervalBackUpDataMinutes = 1; // 60 TODO debug
+    private static readonly int intervalBackUpDataMinutes = 60;
     
     // Vorgefertigte Texte
     internal static readonly string PostIntro = "Schreib-Modus! ✍️\r\n\r\nDie nächste Eingabe von Ihnen wird als Posting interpretiert. " +
@@ -151,7 +151,7 @@ namespace DRaumServerApp
       this.feedbackBot = new Bots.FeedbackBot(this.telegramFeedbackBot);
       this.publishBot = new Bots.PublishBot(this.telegramPublishBot,this.posts, this.textBuilder);
 
-      await this.adminBot.sendMessage(this.startupinfo +"\r\n" + this.statistics.getHardwareInfo());
+      await this.adminBot.sendMessage(this.startupinfo);
 
       logger.Info("Setze das Offset bei den Nachrichten, um nicht erhaltene Updates zu löschen");
       Update[] updates = taskInput.Result;
@@ -249,7 +249,7 @@ namespace DRaumServerApp
         this.telegramAdminBot.StopReceiving();
         ManualResetEvent mre = new ManualResetEvent(false);
         SyncManager.halt(mre);
-        if (!mre.WaitOne(TimeSpan.FromMinutes(1)))// 3 TODO debug
+        if (!mre.WaitOne(TimeSpan.FromMinutes(3)))
         {
           logger.Error("Die Tasks sind nicht alle angehalten! Tasks: " + SyncManager.getRunningTaskCount());
         }
@@ -427,19 +427,19 @@ namespace DRaumServerApp
       this.telegramFeedbackBot.StopReceiving();
       this.telegramAdminBot.StopReceiving();
 
-      await this.adminBot.sendMessage("Server ist beendet!");
+      await this.adminBot.sendMessage("Server ist beendet, letztes Backup wird erstellt!");
       await this.backupData();
 
     }
 
     private void onReceiveError(object sender, ReceiveErrorEventArgs e)
     {
-      logger.Error("Telegram.Bots .NET received an Exception: " + e.ApiRequestException.Message);
+      logger.Error(e.ApiRequestException, "Telegram.Bots .NET liefert Ausnahme: " + e.ApiRequestException.Message + " Quelle:"+e.ApiRequestException.Source +" Stacktrace:"+ e.ApiRequestException.StackTrace);
     }
 
     private void onReceiveGeneralError(object sender, ReceiveGeneralErrorEventArgs e)
     {
-      logger.Error("Telegram.Bots .NET received a general Exception: " + e.Exception.Message);
+      logger.Error(e.Exception, "Telegram.Bots .NET liefert generische Ausnahme: " + e.Exception.Message + " Quelle:"+e.Exception.Source +" Stacktrace:"+ e.Exception.StackTrace);
     }
 
     

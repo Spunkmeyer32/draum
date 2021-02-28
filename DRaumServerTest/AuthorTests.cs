@@ -61,6 +61,26 @@ namespace DRaumServerTest
 
     }
 
+    [TestMethod]
+    public void authorModesTest()
+    {
+      Author author = new Author(10, "Testy");
+      Assert.IsFalse(author.isInFeedbackMode());
+      Assert.IsFalse(author.isInPostMode());
+      author.setFeedbackMode();
+      Assert.IsTrue(author.isInFeedbackMode());
+      Assert.IsFalse(author.isInPostMode());
+      author.unsetModes();
+      Assert.IsFalse(author.isInFeedbackMode());
+      Assert.IsFalse(author.isInPostMode());
+      author.setPostMode();
+      Assert.IsTrue(author.isInPostMode());
+      Assert.IsFalse(author.isInFeedbackMode());
+      author.unsetModes();
+      Assert.IsFalse(author.isInFeedbackMode());
+      Assert.IsFalse(author.isInPostMode());
+    }
+
 
     [TestMethod]
     public void authorDataAndLevelTest()
@@ -97,6 +117,29 @@ namespace DRaumServerTest
       }
 
       Assert.AreEqual(500,author.getLevel());
+
+      author.updateCredibility(70,30);
+      Assert.IsTrue(author.getShortAuthorInfo().EndsWith("70 Prozent Zustimmung"));
+
+    }
+
+    [TestMethod]
+    public void authorManagerTest()
+    {
+      AuthorManager atm = new AuthorManager();
+      // Legt on-the-fly einen nutzer neu an:
+      atm.isCoolDownOver(20, "testuser2", Author.InteractionCooldownTimer.Default);
+
+      Assert.IsTrue(atm.getPublishType(10,100) == PostingPublishManager.PublishHourType.None);
+      Assert.IsTrue(atm.getPublishType(20,100) == PostingPublishManager.PublishHourType.Happy);
+
+      Assert.IsFalse(atm.isPostMode(10,"buh")); // legt als side-effect den nutzer 10 an
+      atm.setPostMode(10,"Test User 2");
+      atm.setPostMode(20,"boho");
+      Assert.IsTrue(atm.isPostMode(10,"Test10"));
+      Assert.IsTrue(atm.isPostMode(20,"Test20"));
+
+      Assert.AreEqual(2, atm.getAuthorCount());
 
     }
 

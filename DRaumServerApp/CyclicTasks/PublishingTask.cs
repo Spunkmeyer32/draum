@@ -59,7 +59,7 @@ namespace DRaumServerApp.CyclicTasks
       {
         try
         {
-          await SyncManager.tryRunAfter(interval,"publishing",cancellationToken);
+          await SyncManager.tryRunAfter(interval,cancellationToken);
           await this.processPublishing();
         }
         catch (OperationCanceledException)
@@ -92,13 +92,13 @@ namespace DRaumServerApp.CyclicTasks
         logger.Info("Nächste MOTD am " + this.lastMessageOfTheDay.AddHours(24).ToString(Utilities.UsedCultureInfo));
         if (!skip)
         {
-          await this.publishBot.publishSilently(MessageOfTheDay);
+          await this.publishBot.publishSilentlyAsHtml(MessageOfTheDay);
         }
       }
 
       skip = false;
       // News-Post
-      if ((DateTime.Now - this.lastWorldNewsPost).TotalHours > 24.0)
+      if (true)//(DateTime.Now - this.lastWorldNewsPost).TotalHours > 24.0)
       {
         if (this.lastWorldNewsPost.Year <= 2000)
         {
@@ -111,7 +111,7 @@ namespace DRaumServerApp.CyclicTasks
         logger.Info("Nächste News am " + this.lastWorldNewsPost.AddHours(24).ToString(Utilities.UsedCultureInfo));
         if (!skip)
         {
-          await this.publishBot.publishSilently(this.worldInfoManager.getInfoStringForChat(true));
+          await this.publishBot.publishSilentlyAsHtml(this.worldInfoManager.getInfoStringForChatAsHtml(true));
         }
       }
 

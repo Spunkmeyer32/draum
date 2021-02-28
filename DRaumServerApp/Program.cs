@@ -19,6 +19,11 @@ namespace DRaumServerApp
       autoResetEvent.Set();
     }
 
+    /// <summary>
+    /// .NET Core 3.1 benutzt die Language-Specification 8, welche async Task Main erlaubt.
+    /// </summary>
+    /// <param name="args"></param>
+    /// <returns></returns>
     // ReSharper disable once InconsistentNaming
     // ReSharper disable once UnusedParameter.Local
     static async Task Main(string[] args)

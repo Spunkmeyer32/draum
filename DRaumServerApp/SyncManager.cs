@@ -19,9 +19,11 @@ namespace DRaumServerApp
 
     /// <summary>
     /// Bevor der Task seine Arbeit verrichtet, sollte er diese Funktion aufrufen, welche eventuell zu synchronisationszwecken blockt
+    /// und vor der Rückkehr einen Delay benutzt
     /// </summary>
-    /// <param name="cancelToken">Falls andere Tasks irgendwo hängen bleiben, kann der Aufruf abgebrochen werden</param>
-    internal static async Task tryRunAfter(TimeSpan delay, string taskName, CancellationToken cancelToken)
+    /// <param name="cancelToken">zum Abbrechen des Delays oder der Synchronisierung</param>
+    /// <param name="delay">Zeit, nach der die Methode zurückkehrt</param>
+    internal static async Task tryRunAfter(TimeSpan delay, CancellationToken cancelToken)
     {
       bool throwCancel = false;
       lock (tasksmutex)

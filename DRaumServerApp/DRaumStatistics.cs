@@ -4,6 +4,7 @@ using McpNetwork.SystemMetrics.Models;
 using Newtonsoft.Json;
 using System;
 using System.Text;
+using System.Threading.Tasks;
 
 
 namespace DRaumServerApp
@@ -86,33 +87,36 @@ namespace DRaumServerApp
       return false;
     }
 
-    internal string getHardwareInfo()
+    internal static async Task<string> getHardwareInfo()
     {
-      hardwareInfo.RefreshMemoryStatus();
-      hardwareInfo.RefreshDriveList();
-      StringBuilder sb = new StringBuilder();
-      sb.Append(((hardwareInfo.MemoryStatus.AvailablePhysical / 1024.0) / 1024.0).ToString("0.00"));
-      sb.Append(" MB freier RAM\r\n");
-      foreach (var drive in hardwareInfo.DriveList)
+      return await Task.Run(() =>
       {
-        foreach (var partition in drive.PartitionList)
+        hardwareInfo.RefreshMemoryStatus();
+        hardwareInfo.RefreshDriveList();
+        StringBuilder sb = new StringBuilder();
+        sb.Append(((hardwareInfo.MemoryStatus.AvailablePhysical / 1024.0) / 1024.0).ToString("0.00"));
+        sb.Append(" MB freier RAM\r\n");
+        foreach (var drive in hardwareInfo.DriveList)
         {
-          foreach (var volume in partition.VolumeList)
+          foreach (var partition in drive.PartitionList)
           {
-            sb.Append(volume.Name);
-            sb.Append(" hat ");
-            sb.Append(((volume.FreeSpace / 1024.0) / 1024.0).ToString("0.0"));
-            sb.Append(" MB freien Platz");
-            sb.Append("\r\n");
+            foreach (var volume in partition.VolumeList)
+            {
+              sb.Append(volume.Name);
+              sb.Append(" hat ");
+              sb.Append(((volume.FreeSpace / 1024.0) / 1024.0).ToString("0.0"));
+              sb.Append(" MB freien Platz");
+              sb.Append("\r\n");
+            }
           }
         }
-      }
 
-      SystemMetrics systemMetrics = new SystemMetrics();
-      Metrics result = systemMetrics.GetMetrics();
-      sb.Append(result.TotalCpuUsage.ToString("0.0"));
-      sb.Append(" % CPU-Last");
-      return sb.ToString();
+        SystemMetrics systemMetrics = new SystemMetrics();
+        Metrics result = systemMetrics.GetMetrics();
+        sb.Append(result.TotalCpuUsage.ToString("0.0"));
+        sb.Append(" % CPU-Last");
+        return sb.ToString();
+      });
     }
 
     internal int getPremiumLevelCap()

@@ -58,7 +58,7 @@ namespace DRaumServerApp.CyclicTasks
       {
         try
         {
-          await SyncManager.tryRunAfter(interval,"statisticcollection",cancellationToken);
+          await SyncManager.tryRunAfter(interval,cancellationToken);
           await this.processStatisticCollection();
         }
         catch (OperationCanceledException)
@@ -78,7 +78,7 @@ namespace DRaumServerApp.CyclicTasks
     {
       string newtext = "Interaktionen im letzten Intervall: " + this.statistics.getLastInteractionIntervalCount()+"\r\n\r\n";
       newtext += "Letztes Backup: " + this.statistics.getLastBackup().ToString(Utilities.UsedCultureInfo)+"\r\n\r\n";
-      newtext += "Hardware-Information:\r\n" + this.statistics.getHardwareInfo() + "\r\n\r\n";
+      newtext += "Hardware-Information:\r\n" + await DRaumStatistics.getHardwareInfo() + "\r\n\r\n";
       newtext += "Median-Votes: " + this.statistics.getMedianVotesPerPost() + "\r\n\r\n";
       newtext += "Interaktive Nutzer: " + this.authors.getAuthorCount();
       // structured logging

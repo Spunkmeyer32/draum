@@ -33,7 +33,7 @@ namespace DRaumServerApp
     private static readonly CultureInfo currencyCulture = Utilities.UsedCultureInfo;
 
 
-    public string getInfoStringForChat(bool retrieveFromWeb)
+    public string getInfoStringForChatAsHtml(bool retrieveFromWeb)
     {
       if (!retrieveFromWeb && ((DateTime.Now - this.lastCheck).TotalHours < 24.0) && this.infoString.Length >= 10 )
       {
@@ -54,23 +54,23 @@ namespace DRaumServerApp
         if (this.infoString.Length < 10)
         {
           // Keine alten Daten, keine Trends anzeigen
-          this.infoString = "== Tagesinfo ==\r\n\r\n🟡 Gold:  " + this.goldPriceInEuro.ToString("C", currencyCulture) + "\r\n" +
-                            "⚪️ Silber:  " + this.silverPriceInEuro.ToString("C", currencyCulture) + "\r\n" +
-                            "⛽️ Super-Benzin:  " + this.unleadedFuelPriceInEuro.ToString("C", currencyCulture) + "\r\n" +
-                            "⛽️ Super-E10:  " + this.unleadedBioFuelPriceInEuro.ToString("C", currencyCulture) + "\r\n" +
-                            "⛽️ Diesel:  " + this.dieselFuelPriceInEuro.ToString("C", currencyCulture) + "\r\n" +
-                            "💰 Bitcoin:  " + this.bitcoinInEuro.ToString("C", currencyCulture) + "\r\n\r\n" +
-                            "📅 Aktualisierung am " + this.lastCheck.ToShortDateString() + " um " + this.lastCheck.ToShortTimeString() + " Uhr";
+          this.infoString = "== Tagesinfo ==\r\n\r\n🟡 Gold:  <code>" + this.goldPriceInEuro.ToString("C", currencyCulture) + "</code>\r\n" +
+                            "⚪️ Silber:  <code>" + this.silverPriceInEuro.ToString("C", currencyCulture) + "</code>\r\n" +
+                            "⛽️ Super-Benzin:  <code>" + this.unleadedFuelPriceInEuro.ToString("C", currencyCulture) + "</code>\r\n" +
+                            "⛽️ Super-E10:  <code>" + this.unleadedBioFuelPriceInEuro.ToString("C", currencyCulture) + "</code>\r\n" +
+                            "⛽️ Diesel:  <code>" + this.dieselFuelPriceInEuro.ToString("C", currencyCulture) + "</code>\r\n" +
+                            "💰 Bitcoin:  <code>" + this.bitcoinInEuro.ToString("C", currencyCulture) + "</code>\r\n\r\n" +
+                            "📅 Aktualisierung am <code>" + this.lastCheck.ToShortDateString() + "</code> um <code>" + this.lastCheck.ToShortTimeString() + "</code> Uhr";
         }
         else
         {
-          this.infoString = "== Tagesinfo ==\r\n\r\n🟡 Gold:  " + this.goldPriceInEuro.ToString("C", currencyCulture) + "  " + this.goldPriceInEuroTrend + "\r\n" +
-                            "⚪️ Silber:  " + this.silverPriceInEuro.ToString("C", currencyCulture) + "  " + this.silverPriceInEuroTrend + "\r\n" +
-                            "⛽️ Super-Benzin:  " + this.unleadedFuelPriceInEuro.ToString("C", currencyCulture) + "  " + this.unleadedFuelPriceInEuroTrend + "\r\n" +
-                            "⛽️ Super-E10:  " + this.unleadedBioFuelPriceInEuro.ToString("C", currencyCulture) + "  " + this.unleadedBioFuelPriceInEuroTrend + "\r\n" +
-                            "⛽️ Diesel:  " + this.dieselFuelPriceInEuro.ToString("C", currencyCulture) + "  " + this.dieselFuelPriceInEuroTrend + "\r\n" +
-                            "💰 Bitcoin:  " + this.bitcoinInEuro.ToString("C", currencyCulture) + "  " + this.bitcoinInEuroTrend + "\r\n\r\n" +
-                            "📅 Aktualisierung am " + this.lastCheck.ToShortDateString() + " um " + this.lastCheck.ToShortTimeString() + " Uhr";
+          this.infoString = "== Tagesinfo ==\r\n\r\n🟡 Gold:  <code>" + this.goldPriceInEuro.ToString("C", currencyCulture) + "  " + this.goldPriceInEuroTrend + "</code>\r\n" +
+                            "⚪️ Silber:  <code>" + this.silverPriceInEuro.ToString("C", currencyCulture) + "  " + this.silverPriceInEuroTrend + "</code>\r\n" +
+                            "⛽️ Super-Benzin:  <code>" + this.unleadedFuelPriceInEuro.ToString("C", currencyCulture) + "  " + this.unleadedFuelPriceInEuroTrend + "</code>\r\n" +
+                            "⛽️ Super-E10:  <code>" + this.unleadedBioFuelPriceInEuro.ToString("C", currencyCulture) + "  " + this.unleadedBioFuelPriceInEuroTrend + "</code>\r\n" +
+                            "⛽️ Diesel:  <code>" + this.dieselFuelPriceInEuro.ToString("C", currencyCulture) + "  " + this.dieselFuelPriceInEuroTrend + "</code>\r\n" +
+                            "💰 Bitcoin:  <code>" + this.bitcoinInEuro.ToString("C", currencyCulture) + "  " + this.bitcoinInEuroTrend + "</code>\r\n\r\n" +
+                            "📅 Aktualisierung am <code>" + this.lastCheck.ToShortDateString() + "</code> um <code>" + this.lastCheck.ToShortTimeString() + "</code> Uhr";
         }
       }
       catch(Exception e)

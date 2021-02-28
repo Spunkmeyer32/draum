@@ -10,7 +10,7 @@ namespace DRaumServerApp.CyclicTasks
   {
     private static readonly NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
 
-    private const int IntervalSendFeedbackSeconds = 30;
+    private const int IntervalSendFeedbackSeconds = 20;
     private readonly CancellationTokenSource cancelTaskSource = new CancellationTokenSource();
     private readonly Task feedbackSendingTask;
 
@@ -49,7 +49,7 @@ namespace DRaumServerApp.CyclicTasks
       {
         try
         {
-          await SyncManager.tryRunAfter(interval,"feedbacksending",cancellationToken);
+          await SyncManager.tryRunAfter(interval,cancellationToken);
           await this.processFeedback();
         }
         catch (OperationCanceledException)

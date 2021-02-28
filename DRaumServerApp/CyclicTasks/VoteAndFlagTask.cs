@@ -61,7 +61,7 @@ namespace DRaumServerApp.CyclicTasks
       {
         try
         {
-          await SyncManager.tryRunAfter(interval,"voteandflag",cancellationToken);
+          await SyncManager.tryRunAfter(interval,cancellationToken);
           await this.processVoteAndFlag(cancellationToken);
         }
         catch (OperationCanceledException)

@@ -1,5 +1,4 @@
 ﻿using Newtonsoft.Json;
-using System;
 using System.Collections.Concurrent;
 using NLog;
 
@@ -9,7 +8,7 @@ namespace DRaumServerApp
   class FeedbackManager
   {
     [JsonIgnore]
-    private static readonly NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
+    private static readonly Logger logger = LogManager.GetCurrentClassLogger();
 
     [JsonIgnore]
     private readonly object dataMutex = new object();

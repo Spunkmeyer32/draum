@@ -171,7 +171,7 @@ namespace DRaumServerApp.Authors
           percentage = (int) ((this.upvotesReceived / (float) (this.upvotesReceived + this.downvotesReceived)) * 100.0f);
         }
       }
-      return "Level " + this.getLevel() + " Schreiber/in mit " + percentage + " Prozent  Zustimmung";
+      return "Level " + this.getLevel() + " Schreiber/in mit " + percentage + " Prozent Zustimmung";
     }
 
     internal void publishedSuccessfully()

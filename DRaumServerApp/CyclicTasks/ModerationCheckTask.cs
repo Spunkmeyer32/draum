@@ -12,7 +12,7 @@ namespace DRaumServerApp.CyclicTasks
 
     private static readonly NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
 
-    private static readonly int intervalModerationCheckMilliseconds = 500;
+    private static readonly int intervalModerationCheckSeconds = 2;
     private readonly CancellationTokenSource cancelTaskSource = new CancellationTokenSource();
     private readonly Task moderationCheckTask;
 
@@ -26,7 +26,7 @@ namespace DRaumServerApp.CyclicTasks
       this.posts = posts;
       this.feedbackManager = feedbackManager;
       this.moderateBot = moderateBot;
-      this.moderationCheckTask = this.periodicModerationCheckTask(new TimeSpan(0, 0, 0, 0, intervalModerationCheckMilliseconds), this.cancelTaskSource.Token);
+      this.moderationCheckTask = this.periodicModerationCheckTask(new TimeSpan(0, 0, 0, intervalModerationCheckSeconds, 0), this.cancelTaskSource.Token);
     }
 
     internal async Task shutDownTask()
@@ -54,7 +54,7 @@ namespace DRaumServerApp.CyclicTasks
       {
         try
         {
-          await SyncManager.tryRunAfter(interval,"moderationcheck",cancellationToken);
+          await SyncManager.tryRunAfter(interval,cancellationToken);
           await this.processModerationCheckTask();
         }
         catch (OperationCanceledException)
@@ -81,6 +81,7 @@ namespace DRaumServerApp.CyclicTasks
         string message = "Es gibt " + postsToCheck + " Posts zu moderieren.";
         if (messageId == -1)
         {
+          // Message neu erstellen
           Message msg = await this.moderateBot.sendMessageWithKeyboard(message,
             TelegramUtilities.Keyboards.getGetNextPostToModerateKeyboard(),false);
           if (msg == null)

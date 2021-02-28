@@ -27,7 +27,7 @@ namespace DRaumServerTest
         while (running)
         {
           v1 = 0;
-          await SyncManager.tryRunAfter(TimeSpan.FromMilliseconds(5), "test1", cts.Token);
+          await SyncManager.tryRunAfter(TimeSpan.FromMilliseconds(5), cts.Token);
           v1 = 1;
           Thread.Sleep(400);
           Console.WriteLine("Task 1");
@@ -43,7 +43,7 @@ namespace DRaumServerTest
         while (running)
         {
           v2 = 0;
-          await SyncManager.tryRunAfter(TimeSpan.FromMilliseconds(5), "test2", cts.Token);
+          await SyncManager.tryRunAfter(TimeSpan.FromMilliseconds(5), cts.Token);
           v2 = 1;
           Thread.Sleep(300);
           Console.WriteLine("Task  2");
@@ -59,7 +59,7 @@ namespace DRaumServerTest
         while (running)
         {
           v3 = 0;
-          await SyncManager.tryRunAfter(TimeSpan.FromMilliseconds(5), "test3", cts.Token);
+          await SyncManager.tryRunAfter(TimeSpan.FromMilliseconds(5), cts.Token);
           v3 = 1;
           Thread.Sleep(200);
           Console.WriteLine("Task   3");
@@ -88,7 +88,13 @@ namespace DRaumServerTest
       Console.WriteLine(DateTime.Now.Millisecond + " all halted");
       Console.Out.Flush();
       SyncManager.unhalt();
-      Thread.Sleep(500);
+      int randomsum = 0;
+      for (int i = 0; i < 10; i++)
+      {
+        randomsum += v1 + v2 + v3;
+        Thread.Sleep(100);
+      }
+      Assert.AreNotEqual(0,randomsum);
 
       running = false;
     }
