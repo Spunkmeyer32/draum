@@ -130,13 +130,13 @@ namespace DRaumServerApp.CyclicTasks
         logger.Info("Nächste Top Tages Posts am " + this.lastTopDaily.AddHours(24).ToString(Utilities.UsedCultureInfo));
         if (!skip)
         {
-          List<long> topPosts = this.posts.getDailyTopPostsFromYesterday();
+          IEnumerable<long> topPosts = this.posts.getDailyTopPostsFromYesterday();
           foreach (long postId in topPosts)
           {
             await this.publishBot.publishInDaily(postId);
             await Task.Delay(3000);
           }
-          List<long> deleteablePosts = this.posts.getPostsToDelete();
+          IEnumerable<long> deleteablePosts = this.posts.getPostsToDelete();
           foreach (long postId in deleteablePosts)
           {
             await this.publishBot.deletePostFromAllChannels(postId);

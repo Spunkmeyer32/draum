@@ -138,29 +138,22 @@ namespace DRaumServerApp.Postings
     }
 
     internal PublishHourType getCurrentpublishType()
-    {      
-      if(DateTime.Now > this.nextPublishSlot)
+    {
+      if (DateTime.Now <= this.nextPublishSlot)
       {
-        PublishHourType result;
-        if (this.nextPublishSlot.Hour == PremiumHour)
-        {
-          result = PublishHourType.Premium;
-        }
-        else
-        {
-          if (this.nextPublishSlot.Hour == HappyHour)
-          {
-            result = PublishHourType.Happy;
-          }
-          else
-          {
-            result = PublishHourType.Normal;
-          }
-        }
-        this.calcNextSlot();
-        return result;
+        return PublishHourType.None;
       }
-      return PublishHourType.None;
+      PublishHourType result;
+      if (this.nextPublishSlot.Hour == PremiumHour)
+      {
+        result = PublishHourType.Premium;
+      }
+      else
+      {
+        result = this.nextPublishSlot.Hour == HappyHour ? PublishHourType.Happy : PublishHourType.Normal;
+      }
+      this.calcNextSlot();
+      return result;
     }
 
 

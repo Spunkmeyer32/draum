@@ -13,6 +13,7 @@ using DRaumServerApp.Postings;
 using DRaumServerApp.TelegramUtilities;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
+using File = System.IO.File;
 
 
 namespace DRaumServerApp
@@ -254,6 +255,7 @@ namespace DRaumServerApp
           logger.Error("Die Tasks sind nicht alle angehalten! Tasks: " + SyncManager.getRunningTaskCount());
         }
         await this.backupData();
+        
         this.telegramInputBot.StartReceiving(receivefilterCallbackAndMessage);
         this.telegramModerateBot.StartReceiving(receivefilterCallbackAndMessage);
         this.telegramPublishBot.StartReceiving(receivefilterCallbackOnly);
@@ -262,7 +264,7 @@ namespace DRaumServerApp
         SyncManager.unhalt();
         logger.Info("Backup erledigt, weitermachen");
         this.statistics.setLastBackup(DateTime.Now);
-        /// TODO Alte Backups löschen
+        this.removeOldBackups();
       }
       catch(Exception e)
       {
@@ -311,25 +313,25 @@ namespace DRaumServerApp
       try
       {
         logger.Info("Lese Autoren-Daten aus dem Dateisystem");
-        inputFilestream = System.IO.File.OpenRead(BackupFolder + Path.DirectorySeparatorChar + dateprefix + FilePrefix + "authors.json");
+        inputFilestream = File.OpenRead(BackupFolder + Path.DirectorySeparatorChar + dateprefix + FilePrefix + "authors.json");
         StreamReader sr = new StreamReader(inputFilestream);
         string jsonstring = sr.ReadToEnd();
         sr.Close();
         this.authors = JsonConvert.DeserializeObject<AuthorManager>(jsonstring);
         logger.Info("Lese Post-Daten aus dem Dateisystem");
-        inputFilestream = System.IO.File.OpenRead(BackupFolder + Path.DirectorySeparatorChar + dateprefix + FilePrefix + "posts.json");
+        inputFilestream = File.OpenRead(BackupFolder + Path.DirectorySeparatorChar + dateprefix + FilePrefix + "posts.json");
         sr = new StreamReader(inputFilestream);
         jsonstring = sr.ReadToEnd();
         sr.Close();
         this.posts = JsonConvert.DeserializeObject<PostingManager>(jsonstring);
         logger.Info("Lese Statistik-Daten aus dem Dateisystem");
-        inputFilestream = System.IO.File.OpenRead(BackupFolder + Path.DirectorySeparatorChar + dateprefix + FilePrefix + "statistic.json");
+        inputFilestream = File.OpenRead(BackupFolder + Path.DirectorySeparatorChar + dateprefix + FilePrefix + "statistic.json");
         sr = new StreamReader(inputFilestream);
         jsonstring = sr.ReadToEnd();
         sr.Close();
         this.statistics = JsonConvert.DeserializeObject<DRaumStatistics>(jsonstring);
         logger.Info("Lese Feedback-Daten aus dem Dateisystem");
-        inputFilestream = System.IO.File.OpenRead(BackupFolder + Path.DirectorySeparatorChar + dateprefix + FilePrefix + "feedback.json");
+        inputFilestream = File.OpenRead(BackupFolder + Path.DirectorySeparatorChar + dateprefix + FilePrefix + "feedback.json");
         sr = new StreamReader(inputFilestream);
         jsonstring = sr.ReadToEnd();
         sr.Close();
@@ -353,6 +355,27 @@ namespace DRaumServerApp
       return false;
     }
 
+    private void removeOldBackups()
+    {
+      try
+      {
+        DirectoryInfo di = new DirectoryInfo(BackupFolder);
+        FileInfo[] fileInfos = di.GetFiles();
+        foreach (FileInfo fileInfo in fileInfos)
+        {
+          if (fileInfo.LastWriteTime < DateTime.Now.AddDays(-3.0))
+          {
+            logger.Info("Lösche altes Backup:" + fileInfo.Name);
+            fileInfo.Delete();
+          }
+        }
+      }
+      catch (Exception e)
+      {
+        logger.Error(e,"Fehler beim Löschen alter Backups");
+      }
+    }
+
     private async Task backupData()
     {
       FileStream backupfile = null;
@@ -365,22 +388,22 @@ namespace DRaumServerApp
         }
         string datestring = getDateFileString();
         logger.Info("Schreibe Post-Daten ins Dateisystem");
-        backupfile = System.IO.File.Create(BackupFolder + Path.DirectorySeparatorChar + datestring + FilePrefix + "posts.json");
+        backupfile = File.Create(BackupFolder + Path.DirectorySeparatorChar + datestring + FilePrefix + "posts.json");
         StreamWriter sr = new StreamWriter(backupfile);
         await sr.WriteAsync(JsonConvert.SerializeObject(this.posts, Formatting.Indented));
         sr.Close();
         logger.Info("Schreibe Autoren-Daten ins Dateisystem");
-        backupfile = System.IO.File.Create(BackupFolder + Path.DirectorySeparatorChar + datestring + FilePrefix + "authors.json");
+        backupfile = File.Create(BackupFolder + Path.DirectorySeparatorChar + datestring + FilePrefix + "authors.json");
         sr = new StreamWriter(backupfile);
         await sr.WriteAsync(JsonConvert.SerializeObject(this.authors, Formatting.Indented));
         sr.Close();
         logger.Info("Schreibe Statistik-Daten ins Dateisystem");
-        backupfile = System.IO.File.Create(BackupFolder + Path.DirectorySeparatorChar + datestring + FilePrefix + "statistic.json");
+        backupfile = File.Create(BackupFolder + Path.DirectorySeparatorChar + datestring + FilePrefix + "statistic.json");
         sr = new StreamWriter(backupfile);
         await sr.WriteAsync(JsonConvert.SerializeObject(this.statistics, Formatting.Indented));
         sr.Close();
         logger.Info("Schreibe Feedback-Daten ins Dateisystem");
-        backupfile = System.IO.File.Create(BackupFolder + Path.DirectorySeparatorChar + datestring + FilePrefix + "feedback.json");
+        backupfile = File.Create(BackupFolder + Path.DirectorySeparatorChar + datestring + FilePrefix + "feedback.json");
         sr = new StreamWriter(backupfile);
         await sr.WriteAsync(JsonConvert.SerializeObject(this.feedbackManager, Formatting.Indented));
         sr.Close();
@@ -632,7 +655,6 @@ namespace DRaumServerApp
           Keyboards.getGotItDeleteButtonKeyboard(),false);
         return;
       }
-      // TODO Der Moderator blockt den Nutzer für einen Tag/ für eine Woche/ für einen Monat
       if(callbackData.getPrefix().Equals(Keyboards.GenericMessageDeletePrefix))
       {
         await this.moderateBot.removeMessage(e.CallbackQuery.Message.MessageId);
@@ -669,6 +691,30 @@ namespace DRaumServerApp
         {
           logger.Error("Der Post konnte nicht gelöscht werden: " + postingPair.Key);
         }
+        return;
+      }
+      if (callbackData.getPrefix().Equals(Keyboards.ModBlockUser3Days))
+      {
+        await this.moderateBot.removeMessage(e.CallbackQuery.Message.MessageId);
+        this.feedbackManager.waitForAuthorBlockText(callbackData.getId(),3);
+        await this.moderateBot.sendMessageWithKeyboard("Begründung für 3 TAGE BLOCK schreiben und abschicken",
+          Keyboards.getGotItDeleteButtonKeyboard(),false);
+        return;
+      }
+      if (callbackData.getPrefix().Equals(Keyboards.ModBlockUser7Days))
+      {
+        await this.moderateBot.removeMessage(e.CallbackQuery.Message.MessageId);
+        this.feedbackManager.waitForAuthorBlockText(callbackData.getId(),7);
+        await this.moderateBot.sendMessageWithKeyboard("Begründung für 7 TAGE BLOCK! schreiben und abschicken",
+          Keyboards.getGotItDeleteButtonKeyboard(),false);
+        return;
+      }
+      if (callbackData.getPrefix().Equals(Keyboards.ModBlockUser30Days))
+      {
+        await this.moderateBot.removeMessage(e.CallbackQuery.Message.MessageId);
+        this.feedbackManager.waitForAuthorBlockText(callbackData.getId(),30);
+        await this.moderateBot.sendMessageWithKeyboard("Begründung für 30 TAGE BLOCK!!! schreiben und abschicken",
+          Keyboards.getGotItDeleteButtonKeyboard(),false);
       }
     }
 
@@ -860,61 +906,79 @@ namespace DRaumServerApp
 
     private async void onFeedbackMessage(object sender, MessageEventArgs e)
     {
-      if (e.Message.Text != null)
+      if (e.Message.Text == null)
       {
-        if (this.feedbackManager.isWaitingForFeedbackReply())
-        {
-          long chatId = this.feedbackManager.processFeedbackReplyAndGetChatId();
-          await this.inputBot.sendMessage(chatId,
-            "Eine Antwort des Kanalbetreibers auf Ihr Feedback:\r\n\r\n" + e.Message.Text);
-          await this.feedbackBot.sendMessage("Feedback-Antwort ist verschickt");
-        }
+        return;
+      }
+      if (this.feedbackManager.isWaitingForFeedbackReply())
+      {
+        long chatId = this.feedbackManager.processFeedbackReplyAndGetChatId();
+        await this.inputBot.sendMessage(chatId,
+          "Eine Antwort des Kanalbetreibers auf Ihr Feedback:\r\n\r\n" + e.Message.Text);
+        await this.feedbackBot.sendMessage("Feedback-Antwort ist verschickt");
       }
     }
 
     private async void onModerateMessage(object sender, MessageEventArgs e)
     {
-      if (e.Message.Text != null)
+      if (e.Message.Text == null)
       {
-        if (this.feedbackManager.isWaitingForModeratedText())
+        return;
+      }
+      if (this.feedbackManager.isWaitingForModeratedText())
+      {
+        // Den moderierten Text dem Nutzer zum bestätigen zuschicken.    
+        long postingId = this.feedbackManager.getNextModeratedPostId();
+        if (this.posts.isPostingInCheck(postingId))
         {
-          // Den moderierten Text dem Nutzer zum bestätigen zuschicken.
-          Posting posting = this.posts.getPostingInCheck(this.feedbackManager.getNextModeratedPostId());          
-          if (posting != null)
-          {
-            posting.updateText(e.Message.Text, true);
-            await this.inputBot.sendMessageWithKeyboard(posting.getAuthorId(), "MODERIERTER TEXT:\r\n\r\n"+posting.getPostingText(), Keyboards.getAcceptDeclineModeratedPostKeyboard(posting.getPostId()));
-            this.feedbackManager.resetProcessModerationText();
-            await this.moderateBot.sendMessageWithKeyboard(
-              "Geänderter Text ist dem Autor zugestellt.", Keyboards.getGotItDeleteButtonKeyboard(),
-              false);
-            await this.moderateBot.removeMessage(e.Message.MessageId);
-          }
-          else
-          {
-            logger.Error("Konnte den zu editierenden Post nicht laden: " + this.feedbackManager.getNextModeratedPostId());
-            await this.moderateBot.sendMessageWithKeyboard(
-              "Der zu editierende Post wurde nicht gefunden. Nochmal den Text abschicken. Wenn der Fehler bestehen bleibt, einen Administrator informieren", 
-              Keyboards.getGotItDeleteButtonKeyboard(),
-              false);
-          }
-          return;
+          this.posts.updatePostText(postingId, e.Message.Text, true);
+          await this.inputBot.sendMessageWithKeyboard(
+            this.posts.getAuthorId(postingId), 
+            "MODERIERTER TEXT:\r\n\r\n"+ this.posts.getPostingTextFromInCheck(postingId), 
+            Keyboards.getAcceptDeclineModeratedPostKeyboard(postingId));
+          this.feedbackManager.resetProcessModerationText();
+          await this.moderateBot.sendMessageWithKeyboard(
+            "Geänderter Text ist dem Autor zugestellt.", Keyboards.getGotItDeleteButtonKeyboard(),
+            false);
+          await this.moderateBot.removeMessage(e.Message.MessageId);
         }
-        if (this.feedbackManager.isWaitingForDenyText())
+        else
         {
-          // Die Begründung dem Nutzer zuschicken.
-          long postingId = this.feedbackManager.getNextModeratedPostId();
-          Posting posting = this.posts.getPostingInCheck(postingId);          
-          if (posting != null)
-          {
-            string teaser = this.posts.getPostingTeaser(postingId);
-            await this.inputBot.sendMessage(posting.getAuthorId(),
-              "Der Beitrag wurde durch Moderation abgelehnt. Begründung:\r\n" +
-              e.Message.Text + "\r\n\r\nBeitragsvorschau: " + teaser);
-            this.feedbackManager.resetProcessModerationText();
-            this.posts.discardPost(postingId);
-          }
+          logger.Error("Konnte den zu editierenden Post nicht laden: " + this.feedbackManager.getNextModeratedPostId());
+          await this.moderateBot.sendMessageWithKeyboard(
+            "Der zu editierende Post wurde nicht gefunden. Nochmal den Text abschicken. Wenn der Fehler bestehen bleibt, einen Administrator informieren", 
+            Keyboards.getGotItDeleteButtonKeyboard(),
+            false);
         }
+        return;
+      }
+      if (this.feedbackManager.isWaitingForDenyText())
+      {
+        // Die Begründung dem Nutzer zuschicken.
+        long postingId = this.feedbackManager.getNextModeratedPostId();     
+        if(this.posts.isPostingInCheck(postingId) )
+        {
+          string teaser = this.posts.getPostingTeaser(postingId);
+          await this.inputBot.sendMessage(this.posts.getAuthorId(postingId),
+            "Der Beitrag wurde durch Moderation abgelehnt. Begründung:\r\n" +
+            e.Message.Text + "\r\n\r\nBeitragsvorschau: " + teaser);
+          this.feedbackManager.resetProcessModerationText();
+          this.posts.discardPost(postingId);
+        }
+      }
+      if (this.feedbackManager.isWaitingForAuthorBlockingText())
+      {
+        // Dem Nutzer die Begründung für den Block schicken
+        long postingId = this.feedbackManager.getNextModeratedPostId();
+        long authorId = this.posts.getAuthorId(postingId);
+        int days = this.feedbackManager.getBlockDays();
+        string teaser = this.posts.getPostingTeaser(postingId);
+        this.authors.blockForDays(authorId,days );
+        await this.inputBot.sendMessage(authorId,
+          "Ihre Beitrag-Schreibe-Möglichkeit ist nun für " + days + " Tage gesperrt. Begründung:\r\n" +
+          e.Message.Text + "\r\n\r\nBasierend auf dem Beitrag: " + teaser);
+        this.feedbackManager.resetProcessModerationText();
+        this.posts.discardPost(postingId);
       }
     }
 

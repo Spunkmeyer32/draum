@@ -58,6 +58,8 @@ namespace DRaumServerApp.Authors
     private ConcurrentBag<long> votedPosts;
     [JsonProperty]
     private ConcurrentBag<long> flaggedPosts;
+    [JsonProperty]
+    private DateTime blockedUntil;
 
     internal Author()
     {
@@ -87,6 +89,7 @@ namespace DRaumServerApp.Authors
       this.postCount = 0;
       this.upvotesReceived = 0;
       this.downvotesReceived = 0;
+      this.blockedUntil = DateTime.Now;
     }
 
     internal static void checkForTestingMode()
@@ -183,11 +186,20 @@ namespace DRaumServerApp.Authors
 
     internal string getAuthorName()
     {
+      if (this.authorName == null)
+      {
+        return "";
+      }
       return this.authorName;
     }
 
     public void setAuthorName(string externalName)
     {
+      if (externalName == null)
+      {
+        this.authorName = "";
+        return;
+      }
       this.authorName = externalName;
     }
 
@@ -229,7 +241,7 @@ namespace DRaumServerApp.Authors
           cooldownTs = this.coolDownTimeStampFlagging;
           break;
         case InteractionCooldownTimer.Posting:
-          cooldownTs = this.coolDownTimeStampPosting;
+          cooldownTs = this.blockedUntil > this.coolDownTimeStampPosting ? this.blockedUntil : this.coolDownTimeStampPosting;
           break;
       }
       if(cooldownTs < DateTime.Now)
@@ -251,7 +263,7 @@ namespace DRaumServerApp.Authors
           cooldownTs = this.coolDownTimeStampFlagging;
           break;
         case InteractionCooldownTimer.Posting:
-          cooldownTs = this.coolDownTimeStampPosting;
+          cooldownTs = this.blockedUntil > this.coolDownTimeStampPosting ? this.blockedUntil : this.coolDownTimeStampPosting;
           break;
       }
       return cooldownTs.Subtract(DateTime.Now);
@@ -321,7 +333,7 @@ namespace DRaumServerApp.Authors
         }
         else
         {
-          int result = Math.Max(10 + (this.votingGauge), 1);
+          int result = Math.Max(10 + this.votingGauge, 1);
           this.votingGauge -= 1;
           if (this.votingGauge < -10)
           {
@@ -332,7 +344,11 @@ namespace DRaumServerApp.Authors
       }
     }
 
-   
+
+    public void blockForDays(int days)
+    {
+      this.blockedUntil = DateTime.Now.AddDays(days);
+    }
   }
     
 }

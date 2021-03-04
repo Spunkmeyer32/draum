@@ -12,6 +12,9 @@ namespace DRaumServerApp.TelegramUtilities
     internal static readonly string ModAcceptPrefix = "Y";
     internal static readonly string ModEditPrefix = "M";
     internal static readonly string ModBlockPrefix = "N";
+    internal static readonly string ModBlockUser3Days = "K";
+    internal static readonly string ModBlockUser7Days = "Q";
+    internal static readonly string ModBlockUser30Days = "P";
     internal static readonly string ModGetNextCheckPostPrefix = "G";
     internal static readonly string ModDeleteFlaggedPrefix = "R";
     internal static readonly string ModClearFlagPrefix = "C";
@@ -126,12 +129,20 @@ namespace DRaumServerApp.TelegramUtilities
     /// <returns></returns>
     internal static InlineKeyboardMarkup getModeratePostKeyboard(long postId)
     {
-      return new InlineKeyboardMarkup(new List<InlineKeyboardButton>
-      {
-        InlineKeyboardButton.WithCallbackData("OK", ModAcceptPrefix + postId),
-        InlineKeyboardButton.WithCallbackData("EDIT", ModEditPrefix + postId),
-        InlineKeyboardButton.WithCallbackData("BLOCK", ModBlockPrefix + postId)
-      });
+      return new InlineKeyboardMarkup(new List<List<InlineKeyboardButton>>{
+        new List<InlineKeyboardButton>
+        {
+          InlineKeyboardButton.WithCallbackData("OK", ModAcceptPrefix + postId),
+          InlineKeyboardButton.WithCallbackData("EDIT", ModEditPrefix + postId),
+          InlineKeyboardButton.WithCallbackData("BLOCK", ModBlockPrefix + postId)
+        },
+        new List<InlineKeyboardButton>
+        {
+          InlineKeyboardButton.WithCallbackData("Sperr 3t", ModBlockUser3Days + postId),
+          InlineKeyboardButton.WithCallbackData("Sperr 7t", ModBlockUser7Days + postId),
+          InlineKeyboardButton.WithCallbackData("Sperr 30t", ModBlockUser30Days + postId)
+        }}
+      );
     }
 
     /// <summary>

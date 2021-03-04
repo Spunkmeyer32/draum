@@ -16,22 +16,23 @@ namespace DRaumServerApp
     private readonly object dataMutexFeedback = new object();
     [JsonIgnore]
     private int moderateMessageId = -1;
-  
-
-    
 
     [JsonProperty]
     private ConcurrentQueue<FeedbackElement> feedbacks;
     [JsonProperty]
-    private bool waitForModeratedText;
+    private volatile bool waitForModeratedText;
     [JsonProperty]
-    private bool waitForDenyText;
+    private volatile bool waitForDenyText;
     [JsonProperty]
     private long nextPostModerationId;
     [JsonProperty]
-    private bool waitForFeedbackReply;
+    private volatile bool waitForFeedbackReply;
     [JsonProperty]
     private long nextChatIdForFeedback;
+    [JsonProperty]
+    private volatile bool waitForAuthorBlockingText;
+    [JsonProperty]
+    private volatile int nextAuthorBlockDays;
 
     internal FeedbackManager()
     {
@@ -80,6 +81,7 @@ namespace DRaumServerApp
       {
         this.waitForModeratedText = true;
         this.waitForDenyText = false;
+        this.waitForAuthorBlockingText = false;
         this.nextPostModerationId = id;
       }
     }
@@ -108,6 +110,19 @@ namespace DRaumServerApp
       {
         this.waitForModeratedText = false;
         this.waitForDenyText = true;
+        this.waitForAuthorBlockingText = false;
+        this.nextPostModerationId = id;
+      }
+    }
+
+    public void waitForAuthorBlockText(long id, int days)
+    {
+      lock (this.dataMutex)
+      {
+        this.waitForDenyText = false;
+        this.waitForModeratedText = false;
+        this.waitForAuthorBlockingText = true;
+        this.nextAuthorBlockDays = days;
         this.nextPostModerationId = id;
       }
     }
@@ -126,6 +141,7 @@ namespace DRaumServerApp
       {
         this.waitForDenyText = false;
         this.waitForModeratedText = false;
+        this.waitForAuthorBlockingText = false;
         this.nextPostModerationId = -1;
       }
     }
@@ -143,6 +159,16 @@ namespace DRaumServerApp
     internal bool isWaitingForDenyText()
     {
       return this.waitForDenyText;
+    }
+
+    internal bool isWaitingForAuthorBlockingText()
+    {
+      return this.waitForAuthorBlockingText;
+    }
+
+    public int getBlockDays()
+    {
+      return this.nextAuthorBlockDays;
     }
   }
 }

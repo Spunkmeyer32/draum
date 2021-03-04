@@ -134,13 +134,15 @@ namespace DRaumServerApp.Postings
     {
       lock (this.textMutex)
       {
-        if (!text.Equals(this.postText))
+        text ??= "";
+        if (text.Equals(this.postText))
         {
-          this.postText = text;
-          if (!dontSetDirtyFlag)
-          {
-            this.dirtyTextFlag = true;
-          }
+          return;
+        }
+        this.postText = text;
+        if (!dontSetDirtyFlag)
+        {
+          this.dirtyTextFlag = true;
         }
       }      
     }

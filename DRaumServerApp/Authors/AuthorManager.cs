@@ -28,19 +28,17 @@ namespace DRaumServerApp.Authors
     [CanBeNull]
     private Author getAuthor(long authorId)
     {
-      if (this.authors.ContainsKey(authorId))
-      {
-        return this.authors[authorId];
-      }
-      return null;
+      return this.authors.ContainsKey(authorId) ? this.authors[authorId] : null;
     }
 
-    private Author getAuthor(long authorId, string externalName) 
+    
+    private Author getAuthor(long authorId, string externalName)
     {
       if (this.authors.ContainsKey(authorId))
       {
-        if (!this.authors[authorId].getAuthorName().Equals(externalName))
+        if (externalName != null && !this.authors[authorId].getAuthorName().Equals(externalName))
         {
+          // Usernamen aktualisieren
           this.authors[authorId].setAuthorName(externalName);
         }
         return this.authors[authorId];
@@ -149,8 +147,7 @@ namespace DRaumServerApp.Authors
 
     internal void setPostMode(long id, string externalName)
     {
-      Author author = this.getAuthor(id, externalName);
-      author?.setPostMode();
+      this.getAuthor(id, externalName)?.setPostMode();
     }
 
     internal PostingPublishManager.PublishHourType getPublishType(long authorId, int premiumLevelCap)
@@ -167,14 +164,12 @@ namespace DRaumServerApp.Authors
 
     internal void unsetModes(long id, string externalName)
     {
-      Author author = this.getAuthor(id, externalName);
-      author?.unsetModes();
+      this.getAuthor(id, externalName)?.unsetModes();
     }
 
     internal void setFeedbackMode(long id, string externalName)
     {
-      Author author = this.getAuthor(id, externalName);
-      author?.setFeedbackMode();
+      this.getAuthor(id, externalName)?.setFeedbackMode();
     }
 
     internal bool isFeedbackMode(long id, string externalName)
@@ -191,8 +186,7 @@ namespace DRaumServerApp.Authors
 
     internal void resetCoolDown(long id, string externalName, Author.InteractionCooldownTimer timerType)
     {
-      Author author = this.getAuthor(id, externalName);
-      author?.resetCoolDown(timerType);
+      this.getAuthor(id, externalName)?.resetCoolDown(timerType);
     }
 
     internal TimeSpan getCoolDownTimer(long id, string externalName, Author.InteractionCooldownTimer timerType)
@@ -213,18 +207,12 @@ namespace DRaumServerApp.Authors
 
     internal void vote(long postingId, long authorId)
     {
-      if (this.authors.ContainsKey(authorId))
-      {
-        this.authors[authorId]?.vote(postingId);
-      }
+      this.getAuthor(authorId)?.vote(postingId);
     }
 
     internal void flag(long postingId, long authorId)
     {
-      if (this.authors.ContainsKey(authorId))
-      {
-        this.authors[authorId]?.flag(postingId);
-      }
+      this.getAuthor(authorId)?.flag(postingId);
     }
 
 
@@ -266,7 +254,11 @@ namespace DRaumServerApp.Authors
       return author?.voteDownAndGetCount() ?? 0;
     }
 
-   
+
+    public void blockForDays(long authorId, int days)
+    {
+      this.getAuthor(authorId)?.blockForDays(days);
+    }
   }
     
 }

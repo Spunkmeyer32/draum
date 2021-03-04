@@ -61,7 +61,7 @@ namespace DRaumServerTest
       } while (pair.Key != -1);
 
       Assert.AreEqual(numposts, count);
-      List<long> list = pmgr.getDailyTopPostsFromYesterday();
+      IEnumerable<long> list = pmgr.getDailyTopPostsFromYesterday();
       bool found10 = false;
       bool found09 = false;
       bool found08 = false;

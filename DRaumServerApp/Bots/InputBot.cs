@@ -82,11 +82,20 @@ namespace DRaumServerApp.Bots
             this.authors.getCoolDownTimer(authorid, authorname, Author.InteractionCooldownTimer.Posting);
           string msgCoolDownText = "⏳ (Spamvermeidung) Zeit bis zum nächsten Posting: " +
                                    coolDownTime.TotalMinutes.ToString("0.0") + " Minute(n)";
-          if (coolDownTime.TotalMinutes > 180)
+          if (coolDownTime.TotalHours > 24)
           {
             msgCoolDownText = "⏳ (Spamvermeidung) Zeit bis zum nächsten Posting: " +
-                              coolDownTime.TotalHours.ToString("0.0") + " Stunde(n)";
+                              coolDownTime.TotalDays.ToString("0.0") + " Tag(e)";
           }
+          else
+          {
+            if (coolDownTime.TotalMinutes > 180)
+            {
+              msgCoolDownText = "⏳ (Spamvermeidung) Zeit bis zum nächsten Posting: " +
+                                coolDownTime.TotalHours.ToString("0.0") + " Stunde(n)";
+            }
+          }
+         
           await this.telegramInputBot.SendTextMessageAsync(
             chatId: chatid,
             text: msgCoolDownText
