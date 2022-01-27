@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using Telegram.Bot;
 using Telegram.Bot.Args;
+using Telegram.Bot.Extensions.Polling;
 using System.Configuration;
 using Newtonsoft.Json;
 using System.IO;
@@ -11,10 +12,11 @@ using DRaumServerApp.Authors;
 using DRaumServerApp.CyclicTasks;
 using DRaumServerApp.Postings;
 using DRaumServerApp.TelegramUtilities;
+using Hardware.Info;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using File = System.IO.File;
-
+using Telegram.Bot.Exceptions;
 
 namespace DRaumServerApp
 {
@@ -59,12 +61,15 @@ namespace DRaumServerApp
 
     private readonly CancellationTokenSource cancelTasksSource = new CancellationTokenSource();
 
+
     #endregion
 
     // Statische Optionen
     private const string BackupFolder = "backups";
     private const string FilePrefix = "_draum_";
-    internal const string Roomname = "d_raum";
+    internal static string Roomname = "d_raum";
+    internal static string Roomname_daily = "d_raum_daily";
+    internal static string Roomname_weekly = "d_raum_weekly";
     private const string Writecommand = "schreiben";
     private const string Feedbackcommand = "nachricht";
 
@@ -73,6 +78,7 @@ namespace DRaumServerApp
     
     // Tasks und Intervalle für das regelmäßige Abarbeiten von Aufgaben
     private static readonly int intervalBackUpDataMinutes = 60;
+    private static readonly int intervalBackUpDataMinutesDebug = 5;
     
     // Vorgefertigte Texte
     internal static readonly string PostIntro = "Schreib-Modus! ✍️\r\n\r\nDie nächste Eingabe von Ihnen wird als Posting interpretiert. " +
@@ -105,6 +111,12 @@ namespace DRaumServerApp
 
     internal void initData()
     {
+      if (Utilities.Runningintestmode)
+      {
+        Roomname = "c/1457606766";
+        Roomname_daily = "c/1151058807";
+        Roomname_weekly = "c/1233617142";
+      }
       logger.Info("Lade Autor-Manager");
       this.authors = new AuthorManager();
       logger.Info("Lade Posting-Manager");
@@ -141,78 +153,28 @@ namespace DRaumServerApp
       this.telegramModerateBot = new TelegramBotClient(ConfigurationManager.AppSettings["telegramModerateToken"]);
       this.telegramAdminBot = new TelegramBotClient(ConfigurationManager.AppSettings["telegramAdminToken"]);
 
-      Task<Update[]> taskInput = this.telegramInputBot.GetUpdatesAsync();
-      Task<Update[]> taskModerate = this.telegramModerateBot.GetUpdatesAsync();
-      Task<Update[]> taskPublish = this.telegramPublishBot.GetUpdatesAsync();
-      Task<Update[]> taskFeedback = this.telegramFeedbackBot.GetUpdatesAsync();
-
-      this.inputBot = new Bots.InputBot(this.authors, this.statistics, this.telegramInputBot, this.posts, this.feedbackManager);
-      this.adminBot = new Bots.AdminBot(this.telegramAdminBot);
-      this.moderateBot = new Bots.ModerateBot(this.telegramModerateBot);
-      this.feedbackBot = new Bots.FeedbackBot(this.telegramFeedbackBot);
-      this.publishBot = new Bots.PublishBot(this.telegramPublishBot,this.posts, this.textBuilder);
+      this.inputBot = new Bots.InputBot(this.authors, this.statistics, this.telegramInputBot, this.posts, this.feedbackManager, onInputBotCallback, HandleErrorAsync);
+      this.adminBot = new Bots.AdminBot(this.telegramAdminBot, onAdminCallback, HandleErrorAsync);
+      this.moderateBot = new Bots.ModerateBot(this.telegramModerateBot, onModerateCallback, HandleErrorAsync);
+      this.feedbackBot = new Bots.FeedbackBot(this.telegramFeedbackBot, onFeedbackCallback, HandleErrorAsync);
+      this.publishBot = new Bots.PublishBot(this.telegramPublishBot,this.posts, this.textBuilder, onPublishCallback, HandleErrorAsync);
 
       await this.adminBot.sendMessage(this.startupinfo);
 
-      logger.Info("Setze das Offset bei den Nachrichten, um nicht erhaltene Updates zu löschen");
-      Update[] updates = taskInput.Result;
-      if (updates.Length > 0)
-      {
-        this.telegramInputBot.MessageOffset = updates[^1].Id + 1;
-      }
-      updates = taskModerate.Result;
-      if (updates.Length > 0)
-      {
-        this.telegramModerateBot.MessageOffset = updates[^1].Id + 1;
-      }
-      updates = taskPublish.Result;
-      if (updates.Length > 0)
-      {
-        this.telegramPublishBot.MessageOffset = updates[^1].Id + 1;
-      }
-      updates = taskFeedback.Result;
-      if (updates.Length > 0)
-      {
-        this.telegramFeedbackBot.MessageOffset = updates[^1].Id + 1;
-      }
-
-      logger.Info("Beginne das Lauschen auf eingehende Nachrichten...");
-      this.telegramInputBot.OnMessage += this.onInputBotMessage;
-      this.telegramInputBot.OnCallbackQuery += this.onInputBotCallback;
-      this.telegramInputBot.OnReceiveError += this.onReceiveError;
-      this.telegramInputBot.OnReceiveGeneralError += this.onReceiveGeneralError;
-      this.telegramInputBot.StartReceiving(receivefilterCallbackAndMessage);
-
-      this.telegramModerateBot.OnCallbackQuery += this.onModerateCallback;
-      this.telegramModerateBot.OnMessage += this.onModerateMessage;
-      this.telegramModerateBot.OnReceiveError += this.onReceiveError;
-      this.telegramModerateBot.OnReceiveGeneralError += this.onReceiveGeneralError;
-      this.telegramModerateBot.StartReceiving(receivefilterCallbackAndMessage);
-
-      this.telegramPublishBot.OnCallbackQuery += this.onPublishCallback;
-      this.telegramPublishBot.OnReceiveError += this.onReceiveError;
-      this.telegramPublishBot.OnReceiveGeneralError += this.onReceiveGeneralError;
-      this.telegramPublishBot.StartReceiving(receivefilterCallbackOnly);
-
-      this.telegramFeedbackBot.OnCallbackQuery += this.onFeedbackCallback;
-      this.telegramFeedbackBot.OnMessage += this.onFeedbackMessage;
-      this.telegramFeedbackBot.OnReceiveError += this.onReceiveError;
-      this.telegramFeedbackBot.OnReceiveGeneralError += this.onReceiveGeneralError;
-      this.telegramFeedbackBot.StartReceiving(receivefilterCallbackAndMessage);
-
-      this.telegramAdminBot.OnCallbackQuery += this.onAdminCallback;
-      this.telegramAdminBot.OnReceiveError += this.onReceiveError;
-      this.telegramAdminBot.OnReceiveGeneralError += this.onReceiveGeneralError;
-      this.telegramAdminBot.StartReceiving(receivefilterCallbackOnly);
-
       logger.Info("Starte periodische Aufgaben");
       this.feedbackSendingTask = new FeedbackSendingTask(this.feedbackManager, this.feedbackBot);
-      this.publishingTask = new PublishingTask(this.publishBot, this.posts);
+      this.publishingTask = new PublishingTask(this.publishBot, this.posts, this.adminBot);
       this.voteAndFlagTask = new VoteAndFlagTask(this.posts, this.publishBot, this.statistics, this.adminBot);
       this.statisticCollectionTask = new StatisticCollectionTask(this.authors, this.statistics, this.posts, this.adminBot);
       this.moderationCheckTask = new ModerationCheckTask(this.posts, this.feedbackManager, this.moderateBot);
-
-      this.backupTask = this.periodicBackupTask(new TimeSpan(0, intervalBackUpDataMinutes, 0), this.cancelTasksSource.Token);
+      if(Utilities.Runningintestmode)
+      {
+        this.backupTask = this.periodicBackupTask(new TimeSpan(0, intervalBackUpDataMinutesDebug, 0), this.cancelTasksSource.Token);
+      }
+      else
+      {
+        this.backupTask = this.periodicBackupTask(new TimeSpan(0, intervalBackUpDataMinutes, 0), this.cancelTasksSource.Token);
+      }      
     }
 
     private async Task periodicBackupTask(TimeSpan interval, CancellationToken cancellationToken)
@@ -234,7 +196,6 @@ namespace DRaumServerApp
         }
         await this.backUpTask();
       }
-
       logger.Info("Backup-Task ist beendet");
     }
 
@@ -243,11 +204,11 @@ namespace DRaumServerApp
       try
       {
         logger.Info("Anhalten für Backup");
-        this.telegramInputBot.StopReceiving();
-        this.telegramModerateBot.StopReceiving();
-        this.telegramPublishBot.StopReceiving();
-        this.telegramFeedbackBot.StopReceiving();
-        this.telegramAdminBot.StopReceiving();
+        this.adminBot.stopListening();
+        this.feedbackBot.stopListening();
+        this.inputBot.stopListening();
+        this.moderateBot.stopListening();
+        this.publishBot.stopListening();
         ManualResetEvent mre = new ManualResetEvent(false);
         SyncManager.halt(mre);
         if (!mre.WaitOne(TimeSpan.FromMinutes(3)))
@@ -255,16 +216,15 @@ namespace DRaumServerApp
           logger.Error("Die Tasks sind nicht alle angehalten! Tasks: " + SyncManager.getRunningTaskCount());
         }
         await this.backupData();
-        
-        this.telegramInputBot.StartReceiving(receivefilterCallbackAndMessage);
-        this.telegramModerateBot.StartReceiving(receivefilterCallbackAndMessage);
-        this.telegramPublishBot.StartReceiving(receivefilterCallbackOnly);
-        this.telegramFeedbackBot.StartReceiving(receivefilterCallbackAndMessage);
-        this.telegramAdminBot.StartReceiving(receivefilterCallbackOnly);
+        this.adminBot.restartListening(onAdminCallback, HandleErrorAsync);
+        this.feedbackBot.restartListening(onFeedbackCallback, HandleErrorAsync);
+        this.inputBot.restartListening(onInputBotCallback, HandleErrorAsync);
+        this.moderateBot.restartListening(onModerateCallback, HandleErrorAsync);
+        this.publishBot.restartListening(onPublishCallback, HandleErrorAsync);
         SyncManager.unhalt();
         logger.Info("Backup erledigt, weitermachen");
         this.statistics.setLastBackup(DateTime.Now);
-        this.removeOldBackups();
+        removeOldBackups();
       }
       catch(Exception e)
       {
@@ -355,7 +315,7 @@ namespace DRaumServerApp
       return false;
     }
 
-    private void removeOldBackups()
+    private static void removeOldBackups()
     {
       try
       {
@@ -444,28 +404,30 @@ namespace DRaumServerApp
       }
 
       logger.Info("Listener werden beendet, Backup wird erstellt");
-      this.telegramInputBot.StopReceiving();
-      this.telegramModerateBot.StopReceiving();
-      this.telegramPublishBot.StopReceiving();
-      this.telegramFeedbackBot.StopReceiving();
-      this.telegramAdminBot.StopReceiving();
+
+      this.adminBot.stopListening();
+      this.feedbackBot.stopListening();
+      this.inputBot.stopListening();
+      this.moderateBot.stopListening();
+      this.publishBot.stopListening();
 
       await this.adminBot.sendMessage("Server ist beendet, letztes Backup wird erstellt!");
       await this.backupData();
 
     }
 
-    private void onReceiveError(object sender, ReceiveErrorEventArgs e)
+    Task HandleErrorAsync(ITelegramBotClient botClient, Exception exception, CancellationToken cancellationToken)
     {
-      logger.Error(e.ApiRequestException, "Telegram.Bots .NET liefert Ausnahme: " + e.ApiRequestException.Message + " Quelle:"+e.ApiRequestException.Source +" Stacktrace:"+ e.ApiRequestException.StackTrace);
+      var ErrorMessage = exception switch
+      {
+        ApiRequestException apiRequestException
+            => $"Telegram API Error:\n[{apiRequestException.ErrorCode}]\n{apiRequestException.Message}",
+        _ => exception.ToString()
+      };
+      logger.Error("Telegram.Bots .NET Ausnahme: " + ErrorMessage);
+      return Task.CompletedTask;
     }
 
-    private void onReceiveGeneralError(object sender, ReceiveGeneralErrorEventArgs e)
-    {
-      logger.Error(e.Exception, "Telegram.Bots .NET liefert generische Ausnahme: " + e.Exception.Message + " Quelle:"+e.Exception.Source +" Stacktrace:"+ e.Exception.StackTrace);
-    }
-
-    
 
     private bool canUserVote(long postingId, long authorId, string authorName)
     {
@@ -555,28 +517,47 @@ namespace DRaumServerApp
 
     // == == CALLBACKS == ==
 
-    private async void onFeedbackCallback(object sender, CallbackQueryEventArgs e)
+    private async Task onFeedbackCallback(ITelegramBotClient botClient, Update e, CancellationToken cancellationToken)
     {
-      if (e.CallbackQuery.Data != null)
+      if (e.Type == UpdateType.Message)
       {
-        DRaumCallbackData callbackData = DRaumCallbackData.parseCallbackData(e.CallbackQuery.Data);
-        if (callbackData.getPrefix().Equals(Keyboards.ModBlockPrefix))
+        // Message
+        if (e.Message.Text == null)
         {
-          // verwerfen des feedbacks
-          await this.feedbackBot.removeInlineMarkup(e.CallbackQuery.Message.MessageId);
           return;
         }
-        if(callbackData.getPrefix().Equals(Keyboards.ModAcceptPrefix))
+        if (this.feedbackManager.isWaitingForFeedbackReply())
         {
-          // Antworten auf das Feedback
-          this.feedbackManager.enableWaitForFeedbackReply(callbackData.getId());
-          await this.feedbackBot.sendMessage("Der nächste eingegebene Text wird an den Autor gesendet");
+          long chatId = this.feedbackManager.processFeedbackReplyAndGetChatId();
+          await this.inputBot.sendMessage(chatId,
+            "Eine Antwort des Kanalbetreibers auf Ihr Feedback:\r\n\r\n" + e.Message.Text);
+          await this.feedbackBot.sendMessage("Feedback-Antwort ist verschickt");
+        }
+      }
+      if (e.Type == UpdateType.CallbackQuery)
+      {
+        // Callback Query
+        if (e.CallbackQuery.Data != null)
+        {
+          DRaumCallbackData callbackData = DRaumCallbackData.parseCallbackData(e.CallbackQuery.Data);
+          if (callbackData.getPrefix().Equals(Keyboards.ModBlockPrefix))
+          {
+            // verwerfen des feedbacks
+            await this.feedbackBot.removeInlineMarkup(e.CallbackQuery.Message.MessageId);
+            return;
+          }
+          if (callbackData.getPrefix().Equals(Keyboards.ModAcceptPrefix))
+          {
+            // Antworten auf das Feedback
+            this.feedbackManager.enableWaitForFeedbackReply(callbackData.getId());
+            await this.feedbackBot.sendMessage("Der nächste eingegebene Text wird an den Autor gesendet");
+          }
         }
       }
     }
 
-    private async void onAdminCallback(object sender, CallbackQueryEventArgs e)
-    {
+    private async Task onAdminCallback(ITelegramBotClient botClient, Update e, CancellationToken cancellationToken)
+    {      
       if(e.CallbackQuery.Data != null)
       {
         DRaumCallbackData callbackData = DRaumCallbackData.parseCallbackData(e.CallbackQuery.Data);
@@ -587,12 +568,30 @@ namespace DRaumServerApp
         }
         if(callbackData.getPrefix().Equals(Keyboards.ModDeleteFlaggedPrefix))
         {
-          // Der Admin entscheided den geflaggten Post zu entfernen
-          string resultText = await this.publishBot.removePostingFromChannels(callbackData.getId());
+          // Der Admin entscheidet den geflaggten Post zu entfernen
+          long postingID = callbackData.getId();
+          int messageId = this.posts.getMessageId(postingID);
+          int messageIdDaily = this.posts.getMessageIdDaily(postingID);
+          int messageIdWeekly = this.posts.getMessageIdWeekly(postingID);
+          if (!this.posts.removePost(postingID))
+          {
+            logger.Error("Konnte den Post " + postingID + " nicht aus dem Datensatz löschen");
+          }
+          await this.adminBot.sendMessageWithKeyboard("Bitte manuell löschen",
+            Keyboards.getPostLinkWithCustomText(messageId, DRaumManager.Roomname,"Link zum D-Raum"));
+          if (messageIdDaily != -1)
+          {
+            await this.adminBot.sendMessageWithKeyboard("Bitte manuell löschen",
+              Keyboards.getPostLinkWithCustomText(messageIdDaily, DRaumManager.Roomname_daily, "Link zum D-Raum-Daily"));
+          }
+          if (messageIdWeekly != -1)
+          {
+            await this.adminBot.sendMessageWithKeyboard("Bitte manuell löschen",
+              Keyboards.getPostLinkWithCustomText(messageIdWeekly, DRaumManager.Roomname_weekly, "Link zum D-Raum-Daily"));
+          }
           // Nachricht aus dem Admin-Chat löschen
           await this.adminBot.removeMessage(e.CallbackQuery.Message.MessageId);
-          // Rückmeldung an Admin
-          await this.adminBot.sendMessageWithKeyboard(resultText, Keyboards.getGotItDeleteButtonKeyboard());
+          
           return;
         }
         if(callbackData.getPrefix().Equals(Keyboards.ModClearFlagPrefix))
@@ -614,111 +613,176 @@ namespace DRaumServerApp
     /// <summary>
     /// Diese Funktion verarbeitet das Drücken der Knöpfe im Moderations-Bot
     /// </summary>
-    private async void onModerateCallback(object sender, CallbackQueryEventArgs e)
+    private async Task onModerateCallback(ITelegramBotClient botClient, Update e, CancellationToken cancellationToken)
     {
-      if (e.CallbackQuery.Data == null)
+      if (e.Type == UpdateType.CallbackQuery)
       {
-        return;
-      }
-      DRaumCallbackData callbackData = DRaumCallbackData.parseCallbackData(e.CallbackQuery.Data);
-      // ==  Der Moderator akzeptiert den Beitrag
-      if (callbackData.getPrefix().Equals(Keyboards.ModAcceptPrefix))
-      {          
-        if(this.acceptPostForPublishing(callbackData.getId()).Result)
+        if (e.CallbackQuery.Data == null)
         {
-          // Message not needed anymore, delete
+          return;
+        }
+        DRaumCallbackData callbackData = DRaumCallbackData.parseCallbackData(e.CallbackQuery.Data);
+        // ==  Der Moderator akzeptiert den Beitrag
+        if (callbackData.getPrefix().Equals(Keyboards.ModAcceptPrefix))
+        {
+          if (this.acceptPostForPublishing(callbackData.getId()).Result)
+          {
+            // Message not needed anymore, delete
+            await this.moderateBot.removeMessage(e.CallbackQuery.Message.MessageId);
+            await this.moderateBot.replyToCallback(e.CallbackQuery.Id, "Beitrag wird freigegeben");
+          }
+          else
+          {
+            await this.moderateBot.replyToCallback(e.CallbackQuery.Id, "Konnte den Post nicht freigeben...");
+          }
+          return;
+        }
+        // ==  Der Moderator will den Beitrag bearbeiten und zurücksenden
+        if (callbackData.getPrefix().Equals(Keyboards.ModEditPrefix))
+        {
+          await this.moderateBot.editMessageButtons(e.CallbackQuery.Message.MessageId,
+            Keyboards.getGotItDeleteButtonKeyboard());
+          this.feedbackManager.waitForModerationText(callbackData.getId());
+          await this.moderateBot.replyToCallback(e.CallbackQuery.Id, "Editierten Beitrag abschicken");
+          return;
+        }
+        // ==  Der Moderator lehnt den Beitrag ab
+        if (callbackData.getPrefix().Equals(Keyboards.ModBlockPrefix))
+        {
+          // Nachricht entfernen
           await this.moderateBot.removeMessage(e.CallbackQuery.Message.MessageId);
-          await this.moderateBot.replyToCallback(e.CallbackQuery.Id, "Beitrag wird freigegeben");
+          this.feedbackManager.waitForDenyingText(callbackData.getId());
+          await this.moderateBot.sendMessageWithKeyboard("Begründung schreiben und abschicken",
+            Keyboards.getGotItDeleteButtonKeyboard(), false);
+          return;
         }
-        else
+        if (callbackData.getPrefix().Equals(Keyboards.GenericMessageDeletePrefix))
         {
-          await this.moderateBot.replyToCallback(e.CallbackQuery.Id, "Konnte den Post nicht freigeben...");
+          await this.moderateBot.removeMessage(e.CallbackQuery.Message.MessageId);
+          return;
         }
-        return;
+        if (callbackData.getPrefix().Equals(Keyboards.ModGetNextCheckPostPrefix))
+        {
+          KeyValuePair<long, string> postingPair = this.posts.getNextPostToCheck();
+          if (postingPair.Key == -1)
+          {
+            return;
+          }
+          Message msg = await this.moderateBot.sendMessageWithKeyboard(postingPair.Value,
+            Keyboards.getModeratePostKeyboard(postingPair.Key), true);
+          if (msg != null)
+          {
+            return;
+          }
+          // keine Nachricht, wieder neu einreihen
+          if (this.posts.putBackIntoQueue(postingPair.Key))
+          {
+            return;
+          }
+          logger.Error("Konnte den Post nicht wieder einfügen, wird gelöscht:" + postingPair.Key + " TEXT:" + postingPair.Value);
+          Posting posting = this.posts.removePostFromInCheck(postingPair.Key);
+          if (posting != null)
+          {
+            await this.inputBot.sendMessage(posting.getAuthorId(),
+              "Dieser Beitrag konnte aufgrund interner Fehler nicht bearbeitet werden:  " +
+              posting.getPostingText() +
+              "\r\n\r\nBitte nochmal probieren. Sollte der Fehler weiterhin bestehen, bitte an einen Administrator wenden.");
+          }
+          else
+          {
+            logger.Error("Der Post konnte nicht gelöscht werden: " + postingPair.Key);
+          }
+          return;
+        }
+        if (callbackData.getPrefix().Equals(Keyboards.ModBlockUser3Days))
+        {
+          await this.moderateBot.removeMessage(e.CallbackQuery.Message.MessageId);
+          this.feedbackManager.waitForAuthorBlockText(callbackData.getId(), 3);
+          await this.moderateBot.sendMessageWithKeyboard("Begründung für 3 TAGE BLOCK schreiben und abschicken",
+            Keyboards.getGotItDeleteButtonKeyboard(), false);
+          return;
+        }
+        if (callbackData.getPrefix().Equals(Keyboards.ModBlockUser7Days))
+        {
+          await this.moderateBot.removeMessage(e.CallbackQuery.Message.MessageId);
+          this.feedbackManager.waitForAuthorBlockText(callbackData.getId(), 7);
+          await this.moderateBot.sendMessageWithKeyboard("Begründung für 7 TAGE BLOCK! schreiben und abschicken",
+            Keyboards.getGotItDeleteButtonKeyboard(), false);
+          return;
+        }
+        if (callbackData.getPrefix().Equals(Keyboards.ModBlockUser30Days))
+        {
+          await this.moderateBot.removeMessage(e.CallbackQuery.Message.MessageId);
+          this.feedbackManager.waitForAuthorBlockText(callbackData.getId(), 30);
+          await this.moderateBot.sendMessageWithKeyboard("Begründung für 30 TAGE BLOCK!!! schreiben und abschicken",
+            Keyboards.getGotItDeleteButtonKeyboard(), false);
+        }
       }
-      // ==  Der Moderator will den Beitrag bearbeiten und zurücksenden
-      if (callbackData.getPrefix().Equals(Keyboards.ModEditPrefix))
+      if(e.Type == UpdateType.Message)
       {
-        await this.moderateBot.editMessageButtons(e.CallbackQuery.Message.MessageId,
-          Keyboards.getGotItDeleteButtonKeyboard());
-        this.feedbackManager.waitForModerationText(callbackData.getId());
-        await this.moderateBot.replyToCallback(e.CallbackQuery.Id, "Editierten Beitrag abschicken");
-        return;
-      }
-      // ==  Der Moderator lehnt den Beitrag ab
-      if (callbackData.getPrefix().Equals(Keyboards.ModBlockPrefix))
-      {
-        // Nachricht entfernen
-        await this.moderateBot.removeMessage(e.CallbackQuery.Message.MessageId);
-        this.feedbackManager.waitForDenyingText(callbackData.getId());
-        await this.moderateBot.sendMessageWithKeyboard("Begründung schreiben und abschicken",
-          Keyboards.getGotItDeleteButtonKeyboard(),false);
-        return;
-      }
-      if(callbackData.getPrefix().Equals(Keyboards.GenericMessageDeletePrefix))
-      {
-        await this.moderateBot.removeMessage(e.CallbackQuery.Message.MessageId);
-        return;
-      }
-      if(callbackData.getPrefix().Equals(Keyboards.ModGetNextCheckPostPrefix))
-      {
-        KeyValuePair<long, string> postingPair = this.posts.getNextPostToCheck();
-        if (postingPair.Key == -1)
+        if (e.Message.Text == null)
         {
           return;
         }
-        Message msg = await this.moderateBot.sendMessageWithKeyboard(postingPair.Value,
-          Keyboards.getModeratePostKeyboard(postingPair.Key), true);
-        if (msg != null)
+        if (this.feedbackManager.isWaitingForModeratedText())
         {
+          // Den moderierten Text dem Nutzer zum bestätigen zuschicken.    
+          long postingId = this.feedbackManager.getNextModeratedPostId();
+          if (this.posts.isPostingInCheck(postingId))
+          {
+            this.posts.updatePostText(postingId, e.Message.Text, true);
+            await this.inputBot.sendMessageWithKeyboard(
+              this.posts.getAuthorId(postingId),
+              "MODERIERTER TEXT:\r\n\r\n" + this.posts.getPostingTextFromInCheck(postingId),
+              Keyboards.getAcceptDeclineModeratedPostKeyboard(postingId));
+            this.feedbackManager.resetProcessModerationText();
+            await this.moderateBot.sendMessageWithKeyboard(
+              "Geänderter Text ist dem Autor zugestellt.", Keyboards.getGotItDeleteButtonKeyboard(),
+              false);
+            await this.moderateBot.removeMessage(e.Message.MessageId);
+          }
+          else
+          {
+            logger.Error("Konnte den zu editierenden Post nicht laden: " + this.feedbackManager.getNextModeratedPostId());
+            await this.moderateBot.sendMessageWithKeyboard(
+              "Der zu editierende Post wurde nicht gefunden. Nochmal den Text abschicken. Wenn der Fehler bestehen bleibt, einen Administrator informieren",
+              Keyboards.getGotItDeleteButtonKeyboard(),
+              false);
+          }
           return;
         }
-        // keine Nachricht, wieder neu einreihen
-        if (this.posts.putBackIntoQueue(postingPair.Key))
+        if (this.feedbackManager.isWaitingForDenyText())
         {
-          return;
+          // Die Begründung dem Nutzer zuschicken.
+          long postingId = this.feedbackManager.getNextModeratedPostId();
+          if (this.posts.isPostingInCheck(postingId))
+          {
+            string teaser = this.posts.getPostingTeaser(postingId);
+            await this.inputBot.sendMessage(this.posts.getAuthorId(postingId),
+              "Der Beitrag wurde durch Moderation abgelehnt. Begründung:\r\n" +
+              e.Message.Text + "\r\n\r\nBeitragsvorschau: " + teaser);
+            this.feedbackManager.resetProcessModerationText();
+            this.posts.discardPost(postingId);
+          }
         }
-        logger.Error("Konnte den Post nicht wieder einfügen, wird gelöscht:" + postingPair.Key + " TEXT:" + postingPair.Value);
-        Posting posting = this.posts.removePostFromInCheck(postingPair.Key);
-        if(posting != null)
+        if (this.feedbackManager.isWaitingForAuthorBlockingText())
         {
-          await this.inputBot.sendMessage(posting.getAuthorId(),
-            "Dieser Beitrag konnte aufgrund interner Fehler nicht bearbeitet werden:  " +
-            posting.getPostingText() +
-            "\r\n\r\nBitte nochmal probieren. Sollte der Fehler weiterhin bestehen, bitte an einen Administrator wenden.");
+          // Dem Nutzer die Begründung für den Block schicken
+          long postingId = this.feedbackManager.getNextModeratedPostId();
+          long authorId = this.posts.getAuthorId(postingId);
+          int days = this.feedbackManager.getBlockDays();
+          string teaser = this.posts.getPostingTeaser(postingId);
+          this.authors.blockForDays(authorId, days);
+          await this.inputBot.sendMessage(authorId,
+            "Ihre Beitrag-Schreibe-Möglichkeit ist nun für " + days + " Tage gesperrt. Begründung:\r\n" +
+            e.Message.Text + "\r\n\r\nBasierend auf dem Beitrag: " + teaser);
+          this.feedbackManager.resetProcessModerationText();
+          this.posts.discardPost(postingId);
         }
-        else
-        {
-          logger.Error("Der Post konnte nicht gelöscht werden: " + postingPair.Key);
-        }
-        return;
-      }
-      if (callbackData.getPrefix().Equals(Keyboards.ModBlockUser3Days))
-      {
-        await this.moderateBot.removeMessage(e.CallbackQuery.Message.MessageId);
-        this.feedbackManager.waitForAuthorBlockText(callbackData.getId(),3);
-        await this.moderateBot.sendMessageWithKeyboard("Begründung für 3 TAGE BLOCK schreiben und abschicken",
-          Keyboards.getGotItDeleteButtonKeyboard(),false);
-        return;
-      }
-      if (callbackData.getPrefix().Equals(Keyboards.ModBlockUser7Days))
-      {
-        await this.moderateBot.removeMessage(e.CallbackQuery.Message.MessageId);
-        this.feedbackManager.waitForAuthorBlockText(callbackData.getId(),7);
-        await this.moderateBot.sendMessageWithKeyboard("Begründung für 7 TAGE BLOCK! schreiben und abschicken",
-          Keyboards.getGotItDeleteButtonKeyboard(),false);
-        return;
-      }
-      if (callbackData.getPrefix().Equals(Keyboards.ModBlockUser30Days))
-      {
-        await this.moderateBot.removeMessage(e.CallbackQuery.Message.MessageId);
-        this.feedbackManager.waitForAuthorBlockText(callbackData.getId(),30);
-        await this.moderateBot.sendMessageWithKeyboard("Begründung für 30 TAGE BLOCK!!! schreiben und abschicken",
-          Keyboards.getGotItDeleteButtonKeyboard(),false);
       }
     }
 
-    private async void onPublishCallback(object sender, CallbackQueryEventArgs e)
+    private async Task onPublishCallback(ITelegramBotClient botClient, Update e, CancellationToken cancellationToken)
     {
       try
       {
@@ -809,178 +873,97 @@ namespace DRaumServerApp
     /// <summary>
     /// Der Nutzer hat einen Beitrag mit Buttons bekommen und muss entscheiden, ob der Beitrag gepostet wird oder nicht
     /// </summary>
-    private async void onInputBotCallback(object sender, CallbackQueryEventArgs e)
+    private async Task onInputBotCallback(ITelegramBotClient botClient, Update e, CancellationToken cancellationToken)
     {
-      if (e.CallbackQuery.Data != null)
+      if (e.Type == UpdateType.CallbackQuery)
       {
-        DRaumCallbackData callbackData = DRaumCallbackData.parseCallbackData(e.CallbackQuery.Data);
-        if (callbackData.getPrefix().Equals(Keyboards.ModAcceptPrefix))
+        if (e.CallbackQuery.Data != null)
         {
-          if(this.acceptPostForPublishing(callbackData.getId()).Result)
+          DRaumCallbackData callbackData = DRaumCallbackData.parseCallbackData(e.CallbackQuery.Data);
+          if (callbackData.getPrefix().Equals(Keyboards.ModAcceptPrefix))
           {
-            await this.inputBot.sendMessage(e.CallbackQuery.From.Id, "Der Beitrag ist angenommen");
+            if (this.acceptPostForPublishing(callbackData.getId()).Result)
+            {
+              await this.inputBot.sendMessage(e.CallbackQuery.From.Id, "Der Beitrag ist angenommen");
+              await this.inputBot.removeMessage(e.CallbackQuery.Message.MessageId, e.CallbackQuery.From.Id);
+            }
+            else
+            {
+              await this.inputBot.sendMessage(e.CallbackQuery.From.Id,
+                "Post konnte nicht veröffentlicht werden. Probieren Sie es nochmal. Falls es wiederholt fehlschlägt, wenden Sie sich an den Administrator.");
+            }
+            return;
+          }
+          if (callbackData.getPrefix().Equals(Keyboards.ModBlockPrefix))
+          {
+            if (!this.posts.removePost(callbackData.getId()))
+            {
+              logger.Error("Konnte den Post nicht aus dem Datensatz löschen: " + callbackData.getId());
+            }
             await this.inputBot.removeMessage(e.CallbackQuery.Message.MessageId, e.CallbackQuery.From.Id);
+            await this.inputBot.sendMessage(e.CallbackQuery.From.Id, "Der Post wird nicht veröffentlicht und verworfen.");
+            return;
+          }
+          if (callbackData.getPrefix().Equals(Keyboards.ModeWritePrefix))
+          {
+            await this.inputBot.switchToWriteMode(e.CallbackQuery.From.Id, e.CallbackQuery.From.Username,
+              e.CallbackQuery.From.Id);
+            return;
+          }
+          if (callbackData.getPrefix().Equals(Keyboards.ModeFeedbackPrefix))
+          {
+            await this.inputBot.switchToFeedbackMode(e.CallbackQuery.From.Id, e.CallbackQuery.From.Username,
+              e.CallbackQuery.From.Id);
+          }
+        }
+      }
+      if(e.Type == UpdateType.Message)
+      {
+        if (e.Message.Text != null)
+        {
+          // Empfängerprüfung und Spam-Block
+          // Dieser Block wirft auch eine Exception, wenn die maximale Nutzerzahl erreicht ist
+          try
+          {
+            if (!this.authors.isCoolDownOver(e.Message.From.Id, e.Message.From.Username, Author.InteractionCooldownTimer.Default))
+            {
+              TimeSpan coolDownTime = this.authors.getCoolDownTimer(e.Message.From.Id, e.Message.From.Username, Author.InteractionCooldownTimer.Default);
+              await this.inputBot.sendMessage(e.Message.From.Id,
+                "⏳ (Spamvermeidung) Zeit bis zur nächsten Bot-Interaktion: " + coolDownTime.TotalMinutes.ToString("0.0") +
+                " Minute(n)");
+              return;
+            }
+          }
+          catch (DRaumException dre)
+          {
+            await this.inputBot.sendMessage(e.Message.From.Id, "Ein Fehler trat auf: " + dre.Message);
+            return;
+          }
+          if (e.Message.Text.Equals("/" + Writecommand))
+          {
+            await this.inputBot.switchToWriteMode(e.Message.From.Id, e.Message.From.Username, e.Message.Chat.Id);
+            return;
+          }
+          if (e.Message.Text.Equals("/" + Feedbackcommand))
+          {
+            await this.inputBot.switchToFeedbackMode(e.Message.From.Id, e.Message.From.Username, e.Message.Chat.Id);
+            return;
+          }
+          if (this.authors.isFeedbackMode(e.Message.From.Id, e.Message.From.Username) ||
+              this.authors.isPostMode(e.Message.From.Id, e.Message.From.Username))
+          {
+            string text = Utilities.telegramEntitiesToHtml(e.Message.Text, e.Message.Entities);
+            await this.inputBot.processTextInput(e.Message.From.Id, e.Message.From.Username, e.Message.Chat.Id, text);
           }
           else
           {
-            await this.inputBot.sendMessage(e.CallbackQuery.From.Id, 
-              "Post konnte nicht veröffentlicht werden. Probieren Sie es nochmal. Falls es wiederholt fehlschlägt, wenden Sie sich an den Administrator.");
-          }
-          return;
-        }
-        if (callbackData.getPrefix().Equals(Keyboards.ModBlockPrefix))
-        {
-          if (!this.posts.removePost(callbackData.getId()))
-          {
-            logger.Error("Konnte den Post nicht aus dem Datensatz löschen: " + callbackData.getId());
-          }
-          await this.inputBot.removeMessage(e.CallbackQuery.Message.MessageId, e.CallbackQuery.From.Id);
-          await this.inputBot.sendMessage(e.CallbackQuery.From.Id, "Der Post wird nicht veröffentlicht und verworfen.");
-          return;
-        }
-        if (callbackData.getPrefix().Equals(Keyboards.ModeWritePrefix))
-        {
-          await this.inputBot.switchToWriteMode(e.CallbackQuery.From.Id, e.CallbackQuery.From.Username,
-            e.CallbackQuery.From.Id);
-          return;
-        }
-        if (callbackData.getPrefix().Equals(Keyboards.ModeFeedbackPrefix))
-        {
-          await this.inputBot.switchToFeedbackMode(e.CallbackQuery.From.Id, e.CallbackQuery.From.Username,
-            e.CallbackQuery.From.Id);
-        }
-      }
-    }
-
-
-    // == == ON MESSAGES == ==
-
-    /// <summary>
-    /// Dies ist der Eingabebot, welcher die Beiträge und Feedback der Nutzer annimmt. Er ist die Schnittstelle zwischen Nutzer und Dem Kanal.
-    /// </summary>
-    private async void onInputBotMessage(object sender, MessageEventArgs e)
-    {
-      if (e.Message.Text != null)
-      {
-        // Empfängerprüfung und Spam-Block
-        // Dieser Block wirft auch eine Exception, wenn die maximale Nutzerzahl erreicht ist
-        try
-        {
-          if (!this.authors.isCoolDownOver(e.Message.From.Id, e.Message.From.Username, Author.InteractionCooldownTimer.Default))
-          {
-            TimeSpan coolDownTime = this.authors.getCoolDownTimer(e.Message.From.Id, e.Message.From.Username, Author.InteractionCooldownTimer.Default);
-            await this.inputBot.sendMessage(e.Message.From.Id, 
-              "⏳ (Spamvermeidung) Zeit bis zur nächsten Bot-Interaktion: " + coolDownTime.TotalMinutes.ToString("0.0") +
-              " Minute(n)");
-            return;
+            // Kein Modus
+            await this.inputBot.sendMessageWithKeyboard(e.Message.From.Id, NoModeChosen, Keyboards.getChooseInputModeKeyboard());
           }
         }
-        catch(DRaumException dre)
-        {
-          await this.inputBot.sendMessage(e.Message.From.Id, "Ein Fehler trat auf: " + dre.Message);
-          return;
-        }
-        if (e.Message.Text.Equals("/" + Writecommand))
-        {
-          await this.inputBot.switchToWriteMode(e.Message.From.Id, e.Message.From.Username, e.Message.Chat.Id);
-          return;
-        }
-        if (e.Message.Text.Equals("/" + Feedbackcommand))
-        {
-          await this.inputBot.switchToFeedbackMode(e.Message.From.Id, e.Message.From.Username, e.Message.Chat.Id);
-          return;
-        }
-        if (this.authors.isFeedbackMode(e.Message.From.Id, e.Message.From.Username) ||
-            this.authors.isPostMode(e.Message.From.Id, e.Message.From.Username))
-        {
-          string text = Utilities.telegramEntitiesToHtml(e.Message.Text, e.Message.Entities);
-          await this.inputBot.processTextInput(e.Message.From.Id, e.Message.From.Username, e.Message.Chat.Id, text);
-        }
-        else
-        {
-          // Kein Modus
-          await this.inputBot.sendMessageWithKeyboard(e.Message.From.Id, NoModeChosen, Keyboards.getChooseInputModeKeyboard());
-        }
       }
     }
 
-    private async void onFeedbackMessage(object sender, MessageEventArgs e)
-    {
-      if (e.Message.Text == null)
-      {
-        return;
-      }
-      if (this.feedbackManager.isWaitingForFeedbackReply())
-      {
-        long chatId = this.feedbackManager.processFeedbackReplyAndGetChatId();
-        await this.inputBot.sendMessage(chatId,
-          "Eine Antwort des Kanalbetreibers auf Ihr Feedback:\r\n\r\n" + e.Message.Text);
-        await this.feedbackBot.sendMessage("Feedback-Antwort ist verschickt");
-      }
-    }
-
-    private async void onModerateMessage(object sender, MessageEventArgs e)
-    {
-      if (e.Message.Text == null)
-      {
-        return;
-      }
-      if (this.feedbackManager.isWaitingForModeratedText())
-      {
-        // Den moderierten Text dem Nutzer zum bestätigen zuschicken.    
-        long postingId = this.feedbackManager.getNextModeratedPostId();
-        if (this.posts.isPostingInCheck(postingId))
-        {
-          this.posts.updatePostText(postingId, e.Message.Text, true);
-          await this.inputBot.sendMessageWithKeyboard(
-            this.posts.getAuthorId(postingId), 
-            "MODERIERTER TEXT:\r\n\r\n"+ this.posts.getPostingTextFromInCheck(postingId), 
-            Keyboards.getAcceptDeclineModeratedPostKeyboard(postingId));
-          this.feedbackManager.resetProcessModerationText();
-          await this.moderateBot.sendMessageWithKeyboard(
-            "Geänderter Text ist dem Autor zugestellt.", Keyboards.getGotItDeleteButtonKeyboard(),
-            false);
-          await this.moderateBot.removeMessage(e.Message.MessageId);
-        }
-        else
-        {
-          logger.Error("Konnte den zu editierenden Post nicht laden: " + this.feedbackManager.getNextModeratedPostId());
-          await this.moderateBot.sendMessageWithKeyboard(
-            "Der zu editierende Post wurde nicht gefunden. Nochmal den Text abschicken. Wenn der Fehler bestehen bleibt, einen Administrator informieren", 
-            Keyboards.getGotItDeleteButtonKeyboard(),
-            false);
-        }
-        return;
-      }
-      if (this.feedbackManager.isWaitingForDenyText())
-      {
-        // Die Begründung dem Nutzer zuschicken.
-        long postingId = this.feedbackManager.getNextModeratedPostId();     
-        if(this.posts.isPostingInCheck(postingId) )
-        {
-          string teaser = this.posts.getPostingTeaser(postingId);
-          await this.inputBot.sendMessage(this.posts.getAuthorId(postingId),
-            "Der Beitrag wurde durch Moderation abgelehnt. Begründung:\r\n" +
-            e.Message.Text + "\r\n\r\nBeitragsvorschau: " + teaser);
-          this.feedbackManager.resetProcessModerationText();
-          this.posts.discardPost(postingId);
-        }
-      }
-      if (this.feedbackManager.isWaitingForAuthorBlockingText())
-      {
-        // Dem Nutzer die Begründung für den Block schicken
-        long postingId = this.feedbackManager.getNextModeratedPostId();
-        long authorId = this.posts.getAuthorId(postingId);
-        int days = this.feedbackManager.getBlockDays();
-        string teaser = this.posts.getPostingTeaser(postingId);
-        this.authors.blockForDays(authorId,days );
-        await this.inputBot.sendMessage(authorId,
-          "Ihre Beitrag-Schreibe-Möglichkeit ist nun für " + days + " Tage gesperrt. Begründung:\r\n" +
-          e.Message.Text + "\r\n\r\nBasierend auf dem Beitrag: " + teaser);
-        this.feedbackManager.resetProcessModerationText();
-        this.posts.discardPost(postingId);
-      }
-    }
 
 
   }

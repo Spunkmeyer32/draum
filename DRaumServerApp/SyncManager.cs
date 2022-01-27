@@ -10,7 +10,7 @@ namespace DRaumServerApp
   internal static class SyncManager
   {
     private static readonly NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
-    private static int _runningTasks;
+    private static volatile int _runningTasks;
     private static readonly object tasksmutex = new object();
     private static volatile bool _shouldWait;
     private static readonly ManualResetEvent resetEvent = new ManualResetEvent(false);

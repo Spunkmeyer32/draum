@@ -43,6 +43,21 @@ namespace DRaumServerApp.TelegramUtilities
     }
 
     /// <summary>
+    /// [ BUTTONTEXT -> ]
+    /// </summary>
+    /// <param name="messageId">Msg-ID des Posts im Draum</param>
+    /// <param name="roomname">Chat-Name des Draums für den Link</param>
+    /// <param name="buttonText">Text, der auf dem Button stehen soll</param>
+    /// <returns></returns>
+    internal static InlineKeyboardMarkup getPostLinkWithCustomText(long messageId, string roomname, string buttonText)
+    {
+      return new InlineKeyboardMarkup(new List<InlineKeyboardButton> 
+      { 
+        InlineKeyboardButton.WithUrl(buttonText, "https://t.me/" + roomname +"/" + messageId)
+      });
+    }
+
+    /// <summary>
     /// [ Lesen und Abstimmen -> ]
     /// </summary>
     /// <param name="messageId">Msg-ID des Posts im Draum</param>

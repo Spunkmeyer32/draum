@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Configuration;
+using System.Threading;
 using System.Threading.Tasks;
 using NLog;
 using Telegram.Bot;
+using Telegram.Bot.Extensions.Polling;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using Telegram.Bot.Types.ReplyMarkups;
@@ -17,10 +19,49 @@ namespace DRaumServerApp.Bots
 
     private readonly long moderateChatId;
 
-    internal ModerateBot(TelegramBotClient telegramModerateBot)
+    private CancellationTokenSource cts = new CancellationTokenSource();
+
+    internal ModerateBot(TelegramBotClient telegramModerateBot, 
+      Func<ITelegramBotClient, Update, CancellationToken, Task> updateHandler,
+      Func<ITelegramBotClient, Exception, CancellationToken, Task> errorHandler)
     {
       this.moderateChatId = long.Parse(ConfigurationManager.AppSettings["moderateChatID"]);
       this.telegramModerateBot = telegramModerateBot;
+
+      var receiverOptions = new ReceiverOptions();
+      receiverOptions.AllowedUpdates = new Telegram.Bot.Types.Enums.UpdateType[] { 
+        Telegram.Bot.Types.Enums.UpdateType.CallbackQuery,
+        Telegram.Bot.Types.Enums.UpdateType.Message
+      };
+      receiverOptions.ThrowPendingUpdates = true;
+      this.telegramModerateBot.StartReceiving(
+        updateHandler,
+        errorHandler,
+        receiverOptions,
+        cancellationToken: cts.Token);
+
+    }
+
+    internal void stopListening()
+    {
+      this.cts.Cancel();
+    }
+
+    internal void restartListening(Func<ITelegramBotClient, Update, CancellationToken, Task> updateHandler,
+      Func<ITelegramBotClient, Exception, CancellationToken, Task> errorHandler)
+    {
+      cts = new CancellationTokenSource();
+      var receiverOptions = new ReceiverOptions();
+      receiverOptions.AllowedUpdates = new Telegram.Bot.Types.Enums.UpdateType[] {
+        Telegram.Bot.Types.Enums.UpdateType.CallbackQuery,
+        Telegram.Bot.Types.Enums.UpdateType.Message
+      };
+      receiverOptions.ThrowPendingUpdates = true;
+      this.telegramModerateBot.StartReceiving(
+        updateHandler,
+        errorHandler,
+        receiverOptions,
+        cancellationToken: cts.Token);
     }
 
 

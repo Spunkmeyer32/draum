@@ -1,8 +1,11 @@
 ﻿using System;
+using System.Threading;
 using System.Threading.Tasks;
 using DRaumServerApp.Authors;
 using DRaumServerApp.Postings;
 using Telegram.Bot;
+using Telegram.Bot.Extensions.Polling;
+using Telegram.Bot.Types;
 using Telegram.Bot.Types.ReplyMarkups;
 
 namespace DRaumServerApp.Bots
@@ -17,13 +20,53 @@ namespace DRaumServerApp.Bots
     private readonly PostingManager posts;
     private readonly FeedbackManager feedbackManager;
 
-    internal InputBot(AuthorManager authors, DRaumStatistics statistics, TelegramBotClient telegramInputBot, PostingManager posts, FeedbackManager feedbackManager)
+    private CancellationTokenSource cts = new CancellationTokenSource();
+
+    internal InputBot(AuthorManager authors, DRaumStatistics statistics, TelegramBotClient telegramInputBot, 
+      PostingManager posts, FeedbackManager feedbackManager,
+      Func<ITelegramBotClient, Update, CancellationToken, Task> updateHandler,
+      Func<ITelegramBotClient, Exception, CancellationToken, Task> errorHandler)
     {
       this.authors = authors;
       this.statistics = statistics;
       this.telegramInputBot = telegramInputBot;
       this.posts = posts;
       this.feedbackManager = feedbackManager;
+
+      var receiverOptions = new ReceiverOptions();
+      receiverOptions.AllowedUpdates = new Telegram.Bot.Types.Enums.UpdateType[] { 
+        Telegram.Bot.Types.Enums.UpdateType.CallbackQuery,
+        Telegram.Bot.Types.Enums.UpdateType.Message
+      };
+      receiverOptions.ThrowPendingUpdates = true;
+      this.telegramInputBot.StartReceiving(
+        updateHandler,
+        errorHandler,
+        receiverOptions,
+        cancellationToken: cts.Token);
+
+    }
+
+    internal void stopListening()
+    {
+      this.cts.Cancel();
+    }
+
+    internal void restartListening(Func<ITelegramBotClient, Update, CancellationToken, Task> updateHandler,
+      Func<ITelegramBotClient, Exception, CancellationToken, Task> errorHandler)
+    {
+      cts = new CancellationTokenSource();
+      var receiverOptions = new ReceiverOptions();
+      receiverOptions.AllowedUpdates = new Telegram.Bot.Types.Enums.UpdateType[] {
+        Telegram.Bot.Types.Enums.UpdateType.CallbackQuery,
+        Telegram.Bot.Types.Enums.UpdateType.Message
+      };
+      receiverOptions.ThrowPendingUpdates = true;
+      this.telegramInputBot.StartReceiving(
+        updateHandler,
+        errorHandler,
+        receiverOptions,
+        cancellationToken: cts.Token);
     }
 
     internal async Task removeMessage(int messageId, long authorId)

@@ -7,6 +7,7 @@ using DRaumServerApp.TelegramUtilities;
 using NLog;
 using Telegram.Bot;
 using Telegram.Bot.Exceptions;
+using Telegram.Bot.Extensions.Polling;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 
@@ -23,7 +24,11 @@ namespace DRaumServerApp.Bots
     private readonly long draumWeeklyChatId;
     private readonly PostingTextBuilder textBuilder;
 
-    internal PublishBot(TelegramBotClient telegramPublishBot, PostingManager posts, PostingTextBuilder textBuilder)
+    private CancellationTokenSource cts = new CancellationTokenSource();
+
+    internal PublishBot(TelegramBotClient telegramPublishBot, PostingManager posts, PostingTextBuilder textBuilder, 
+      Func<ITelegramBotClient, Update, CancellationToken, Task> updateHandler,
+      Func<ITelegramBotClient, Exception, CancellationToken, Task> errorHandler)
     {
       this.draumChatId = long.Parse(ConfigurationManager.AppSettings["mainRoomID"]);
       this.draumDailyChatId = long.Parse(ConfigurationManager.AppSettings["dailyRoomID"]);
@@ -31,6 +36,35 @@ namespace DRaumServerApp.Bots
       this.telegramPublishBot = telegramPublishBot;
       this.textBuilder = textBuilder;
       this.posts = posts;
+
+      var receiverOptions = new ReceiverOptions();
+      receiverOptions.AllowedUpdates = new Telegram.Bot.Types.Enums.UpdateType[] { Telegram.Bot.Types.Enums.UpdateType.CallbackQuery };
+      receiverOptions.ThrowPendingUpdates = true;
+      this.telegramPublishBot.StartReceiving(
+        updateHandler,
+        errorHandler,
+        receiverOptions,
+        cancellationToken: cts.Token);
+
+    }
+
+    internal void stopListening()
+    {
+      this.cts.Cancel();
+    }
+
+    internal void restartListening(Func<ITelegramBotClient, Update, CancellationToken, Task> updateHandler,
+      Func<ITelegramBotClient, Exception, CancellationToken, Task> errorHandler)
+    {
+      cts = new CancellationTokenSource();
+      var receiverOptions = new ReceiverOptions();
+      receiverOptions.AllowedUpdates = new Telegram.Bot.Types.Enums.UpdateType[] { Telegram.Bot.Types.Enums.UpdateType.CallbackQuery };
+      receiverOptions.ThrowPendingUpdates = true;
+      this.telegramPublishBot.StartReceiving(
+        updateHandler,
+        errorHandler,
+        receiverOptions,
+        cancellationToken: cts.Token);
     }
 
 
@@ -52,14 +86,15 @@ namespace DRaumServerApp.Bots
       }
       catch (Exception ex)
       {
-        if (ex is MessageIsNotModifiedException)
+        /// TODO Migrate!
+        /*if (ex is  MessageIsNotModifiedException)
         {
           this.posts.resetDirtyFlag(postId);
           logger.Warn("Die Buttons des Posts " + postId + " waren nicht verändert");
         }
-        else
+        else*/
         {
-          logger.Error(ex, "Beim aktualisieren eines Buttons eines Beitrags (" + postId + ") trat ein Fehler auf.");
+          logger.Error(ex, "Beim aktualisieren eines Buttons eines Beitrags (" + postId + ") trat ein Fehler auf: " + ex.Message);
         }
       }
     }
@@ -79,14 +114,15 @@ namespace DRaumServerApp.Bots
       }
       catch (Exception ex)
       {
-        if (ex is MessageIsNotModifiedException)
+        /// TODO Migrate!
+        /*if (ex is MessageIsNotModifiedException)
         {
           this.posts.resetTextDirtyFlag(postId);
           logger.Warn("Der Text des Posts " + postId + " ist nicht verändert");
         }
-        else
+        else */
         {
-          logger.Error(ex, "Beim aktualisieren eines Textes eines Beitrags (" + postId + ") trat ein Fehler auf.");
+          logger.Error(ex, "Beim aktualisieren eines Textes eines Beitrags (" + postId + ") trat ein Fehler auf: " + ex.Message);
         }
       }
     }
@@ -128,59 +164,6 @@ namespace DRaumServerApp.Bots
           logger.Error(ex, "Fehler beim Veröffentlichen eines Posts im D-Raum, PostingId: " + postingId + " wird neu eingereiht.");
           this.posts.reAcceptFailedPost(postingId);
         }
-      }
-    }
-
-
-    internal async Task deletePostFromAllChannels(long postId)
-    {
-      logger.Info("Es soll folgender Post gelöscht werden (abgelaufen): " + postId);
-      long messageId = this.posts.getMessageId(postId);
-      if (messageId != -1)
-      {
-        try
-        {
-          await this.telegramPublishBot.DeleteMessageAsync(
-            chatId: this.draumChatId,
-            messageId: (int)messageId);
-        }
-        catch (Exception ex)
-        {
-          logger.Error(ex, "Fehler beim Löschen aus dem D-Raum");
-        }
-      }
-      long messageDailyId = this.posts.getMessageIdDaily(postId);
-      if (messageDailyId != -1)
-      {
-        try
-        {
-          await this.telegramPublishBot.DeleteMessageAsync(
-            chatId: this.draumDailyChatId,
-            messageId: (int)messageDailyId);
-        }
-        catch (Exception ex)
-        {
-          logger.Error(ex, "Fehler beim Löschen aus dem D-Raum-Täglich");
-        }
-      }
-      long messageWeeklyId = this.posts.getMessageIdWeekly(postId);
-      if (messageWeeklyId != -1)
-      {
-        try
-        {
-          await this.telegramPublishBot.DeleteMessageAsync(
-            chatId: this.draumWeeklyChatId,
-            messageId: (int)messageWeeklyId);
-        }
-        catch (Exception ex)
-        {
-          logger.Error(ex, "Fehler beim Löschen aus dem D-Raum-Wöchentlich");
-        }
-      }
-
-      if (!this.posts.removePost(postId))
-      {
-        logger.Error("Konnte den Post nicht aus dem Datensatz löschen : " + postId);
       }
     }
 
@@ -259,52 +242,6 @@ namespace DRaumServerApp.Bots
       }
     }
 
-    internal async Task<string> removePostingFromChannels(long postingId)
-    {
-      int messageId = this.posts.getMessageId(postingId);
-      int messageIdDaily = this.posts.getMessageIdDaily(postingId);
-      int messageIdWeekly = this.posts.getMessageIdWeekly(postingId);
-      string resultText = "Der Beitrag wurde gelöscht";
-      if (messageId != -1)
-      {
-        if (!this.posts.removePost(postingId))
-        {
-          logger.Error("Konnte den Post "+postingId+" nicht aus dem Datensatz löschen");
-          resultText = "Konnte nicht aus dem Datensatz gelöscht werden.";
-        }
-        try
-        {
-          // Nachricht aus dem D-Raum löschen
-          await this.telegramPublishBot.DeleteMessageAsync(
-            chatId: this.draumChatId,
-            messageId: messageId);
-          if (messageIdDaily != -1)
-          {
-            await this.telegramPublishBot.DeleteMessageAsync(
-              chatId: this.draumDailyChatId,
-              messageId: messageIdDaily);
-          }
-          if (messageIdWeekly != -1)
-          {
-            await this.telegramPublishBot.DeleteMessageAsync(
-              chatId: this.draumWeeklyChatId,
-              messageId: messageIdWeekly);
-          }
-          resultText += "\r\nDer Beitrag wurde aus den Kanälen gelöscht";
-        }
-        catch (Exception ex)
-        {
-          logger.Error(ex, "Konnte den Post nicht aus den Kanälen löschen: " + postingId);
-          resultText += "\r\nBeim Löschen aus den Chats gab es Probleme";
-        }
-      }
-      else
-      {
-        logger.Error("Es konnte keine Message-ID gefunden werden (im Chat) um den Beitrag zu löschen : " + postingId);
-        resultText = "Der Post "+postingId+" scheint gar nicht veröffentlicht zu sein";
-      }
-      return resultText;
-    }
 
 
     internal async Task answerCallback(string callbackId, string message)

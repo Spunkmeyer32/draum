@@ -84,10 +84,10 @@ namespace DRaumServerApp
     private void getGold()
     {
       var client = new RestClient("https://www.goldapi.io/api/XAU/EUR");
-      var request = new RestRequest(Method.GET);
+      var request = new RestRequest("", Method.Get);
       request.AddHeader("x-access-token", ConfigurationManager.AppSettings["infoAPIKeyGold"] );
       request.AddHeader("Content-Type", "application/json");
-      IRestResponse response = client.Execute(request);
+      RestResponse response = client.ExecuteGetAsync(request).Result;
       JObject jsonResponse = JObject.Parse(response.Content);
       try
       {
@@ -118,10 +118,10 @@ namespace DRaumServerApp
     private void getSilver()
     {
       var client = new RestClient("https://www.goldapi.io/api/XAG/EUR");
-      var request = new RestRequest(Method.GET);
+      var request = new RestRequest("",Method.Get);
       request.AddHeader("x-access-token", ConfigurationManager.AppSettings["infoAPIKeyGold"] );
       request.AddHeader("Content-Type", "application/json");
-      IRestResponse response = client.Execute(request);
+      RestResponse response = client.ExecuteGetAsync(request).Result;
       JObject jsonResponse = JObject.Parse(response.Content);
       try
       {
@@ -153,9 +153,9 @@ namespace DRaumServerApp
     {
       string url = "https://creativecommons.tankerkoenig.de/json/prices.php?ids="+ ConfigurationManager.AppSettings["infoAPIIDFuel"] + "&apikey="+ ConfigurationManager.AppSettings["infoAPIKeyFuel"];
       var client = new RestClient(url);
-      var request = new RestRequest(Method.GET);
+      var request = new RestRequest("",Method.Get);
       request.AddHeader("Content-Type", "application/json");
-      IRestResponse response = client.Execute(request);
+      RestResponse response = client.ExecuteGetAsync(request).Result;
       JObject jsonResponse = JObject.Parse(response.Content);
       try
       {
@@ -220,10 +220,10 @@ namespace DRaumServerApp
     private void getBitcoin()
     {
       var client = new RestClient("https://rest.coinapi.io/v1/exchangerate/BTC/EUR");
-      var request = new RestRequest(Method.GET);
+      var request = new RestRequest("",Method.Get);
       request.AddHeader("Content-Type", "application/json");
       request.AddHeader("X-CoinAPI-Key", ConfigurationManager.AppSettings["infoAPIKeyBitcoin"]);
-      IRestResponse response = client.Execute(request);
+      RestResponse response = client.ExecuteGetAsync(request).Result;
       JObject jsonResponse = JObject.Parse(response.Content);
       try
       {

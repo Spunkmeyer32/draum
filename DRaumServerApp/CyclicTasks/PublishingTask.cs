@@ -4,7 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using DRaumServerApp.Bots;
 using DRaumServerApp.Postings;
-
+using DRaumServerApp.TelegramUtilities;
 
 
 namespace DRaumServerApp.CyclicTasks
@@ -26,11 +26,15 @@ namespace DRaumServerApp.CyclicTasks
     private readonly CancellationTokenSource cancelTaskSource = new CancellationTokenSource();
     private readonly Task publishTask;
     private readonly PublishBot publishBot;
+    private readonly AdminBot adminBot;
 
-    internal PublishingTask(PublishBot publishBot,PostingManager postingManager)
+    private int lastSeenPostsToEdit = 0;
+
+    internal PublishingTask(PublishBot publishBot,PostingManager postingManager, AdminBot adminBot)
     {
       this.posts = postingManager;
       this.publishBot = publishBot;
+      this.adminBot = adminBot;
       this.publishTask = this.periodicPublishingTask(new TimeSpan(0, 0, 0, IntervalCheckPublishSeconds, 0), this.cancelTaskSource.Token);
     }
 
@@ -77,6 +81,15 @@ namespace DRaumServerApp.CyclicTasks
 
     private async Task processPublishing()
     {
+      int newPostsToEdit = this.posts.howManyPostsToCheck();
+      if (lastSeenPostsToEdit != newPostsToEdit)
+      {
+        lastSeenPostsToEdit = newPostsToEdit;
+        if (lastSeenPostsToEdit > 0)
+        {
+          await this.adminBot.sendMessage("Es sind Beiträge zum Moderieren vorhanden");
+        }
+      }
       bool skip = false;
       // Message Of The Day
       if ((DateTime.Now - this.lastMessageOfTheDay).TotalHours > 24.0)
@@ -108,6 +121,7 @@ namespace DRaumServerApp.CyclicTasks
           }
         }
         this.lastWorldNewsPost = new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day, 9, 0, 0);
+
         logger.Info("Nächste News am " + this.lastWorldNewsPost.AddHours(24).ToString(Utilities.UsedCultureInfo));
         if (!skip)
         {
@@ -137,9 +151,28 @@ namespace DRaumServerApp.CyclicTasks
             await Task.Delay(3000);
           }
           IEnumerable<long> deleteablePosts = this.posts.getPostsToDelete();
-          foreach (long postId in deleteablePosts)
+          foreach (long postingID in deleteablePosts)
           {
-            await this.publishBot.deletePostFromAllChannels(postId);
+            
+            int messageId = this.posts.getMessageId(postingID);
+            int messageIdDaily = this.posts.getMessageIdDaily(postingID);
+            int messageIdWeekly = this.posts.getMessageIdWeekly(postingID);
+            if (!this.posts.removePost(postingID))
+            {
+              logger.Error("Konnte den Post " + postingID + " nicht aus dem Datensatz löschen");
+            }
+            await this.adminBot.sendMessageWithKeyboard("Bitte manuell löschen",
+              Keyboards.getPostLinkWithCustomText(messageId, DRaumManager.Roomname, "Link zum D-Raum"));
+            if (messageIdDaily != -1)
+            {
+              await this.adminBot.sendMessageWithKeyboard("Bitte manuell löschen",
+                Keyboards.getPostLinkWithCustomText(messageIdDaily, DRaumManager.Roomname_daily, "Link zum D-Raum-Daily"));
+            }
+            if (messageIdWeekly != -1)
+            {
+              await this.adminBot.sendMessageWithKeyboard("Bitte manuell löschen",
+                Keyboards.getPostLinkWithCustomText(messageIdWeekly, DRaumManager.Roomname_weekly, "Link zum D-Raum-Daily"));
+            }
             await Task.Delay(3000);
           }
         }
